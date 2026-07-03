@@ -1,0 +1,13 @@
+# OS / 編輯器雜項
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# 暫存 / 測試檔
+scratchpad/
+*.log
+/preview*.html
+/test.html
+/anim-test.html
