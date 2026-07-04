@@ -96,24 +96,22 @@ export function settleRound() {
 
   for (const [E, atk] of Object.entries(attackers)) {
     const loc = GAME.locations[E];
-    // 參戰勢力：各攻方 + 守方（現駐軍）
-    const parties = [];
-    for (const [team, n] of Object.entries(atk)) parties.push({ team: Number(team), troops: n, def: false });
+    const attackList = Object.entries(atk).map(([team, n]) => ({ team: Number(team), troops: n }));
     const defTeam = loc.owner;
     const defTroops = defTeam != null ? (garrison[E][defTeam] || 0) : 0;
-    if (defTroops > 0) parties.push({ team: defTeam, troops: defTroops, def: true });
 
-    const { winner, retreats, steps } = resolveBattle(parties);
+    const { outcome, retreats, steps } = resolveBattle(attackList, defTeam, defTroops);
     // 抵銷後撤退的兵 → 回到兵營
     for (const [t, n] of Object.entries(retreats)) barracks[t] = (barracks[t] || 0) + n;
 
-    if (!winner) { garrison[E] = {}; loc.owner = null; }
-    else { garrison[E] = { [winner.team]: winner.troops }; loc.owner = winner.team; }
+    if (outcome.type === 'neutral') { garrison[E] = {}; loc.owner = null; }
+    else if (outcome.type === 'hold') { garrison[E] = { [defTeam]: outcome.troops }; loc.owner = defTeam; }
+    else if (outcome.type === 'capture') { garrison[E] = { [outcome.team]: outcome.troops }; loc.owner = outcome.team; }
 
     for (const s of steps) log.attack.push(`【${loc.label}】${s}`);
-    if (!winner) log.attack.push(`【${loc.label}】各方抵銷殆盡，成為無人空島`);
     log.events.push({ phase: 'attack', kind: 'clash', at: elIsl(E),
-      result: winner ? `${winner.team}隊佔領 ${loc.label}（剩 ${winner.troops}）` : `${loc.label} 成空島` });
+      result: outcome.type === 'capture' ? `${outcome.team}隊佔領 ${loc.label}（剩 ${outcome.troops}）`
+        : outcome.type === 'hold' ? `${defTeam}隊守住 ${loc.label}` : `${loc.label} 成空島` });
   }
 
   // 回寫戰後狀態
@@ -145,43 +143,66 @@ export function settleRound() {
 
 // ---------------------------------------------------------
 // 攻擊裁決
-// ・找出目前最高兵力；若「同為最高」有多方 → 這些方各損一半後喪失攻擊資格
-//   （存活的一半撤回兵營），再往下一層比。
-// ・直到出現「唯一最高者」→ 勝出，扣掉次強者的兵力後留駐該島；其餘落敗者全滅。
-// 回傳 { winner:{team,troops,def}|null, retreats:{team:n}, steps:[文字] }
+// 第一階段（攻方內鬥）：多支進攻同一島的部隊，找出目前最高兵力；
+//   若「同為最高」有多方 → 這些方各損一半、另一半撤回兵營，並喪失攻擊資格；
+//   往下一層比，直到出現「唯一最高的攻方」＝突圍者（challenger）。
+//   其餘未突圍的較弱攻方 → 進攻失敗、全滅。
+// 第二階段（突圍者 vs 守軍）：
+//   突圍者 > 守軍 → 佔領，扣掉守軍兵力後留駐；守軍全滅。
+//   突圍者 < 守軍 → 守方守住，扣掉突圍者兵力後留駐；突圍者全滅。
+//   相等 → 同歸於盡，成空島。
+//   無守軍 → 突圍者直接佔領（不扣兵）。
+//   攻方全數抵銷 → 守方原封守住 / 無守軍則成空島。
+// 回傳 { outcome, retreats:{team:n}, steps:[文字] }
+//   outcome: {type:'capture',team,troops} | {type:'hold',troops} | {type:'neutral'}
 // ---------------------------------------------------------
-function resolveBattle(parties) {
-  let ps = parties.filter(p => p.troops > 0).map(p => ({ ...p }));
+function resolveBattle(attackList, defTeam, defTroops) {
+  let atk = attackList.filter(a => a.troops > 0).map(a => ({ ...a }));
   const retreats = {}, steps = [];
-  const nm = p => `${p.team}隊${p.def ? '(守)' : ''}`;
-  if (ps.length === 0) return { winner: null, retreats, steps };
 
+  // 第一階段：攻方同額抵銷，選出突圍者
   let guard = 0;
-  while (guard++ < 200) {
-    if (ps.length === 1) {
-      const w = ps[0];
-      steps.push(`${nm(w)} 無對手，${w.def ? '守住' : '佔領'}，留 ${w.troops} 兵`);
-      return { winner: w, retreats, steps };
-    }
-    const max = Math.max(...ps.map(p => p.troops));
-    const tied = ps.filter(p => p.troops === max);
+  while (atk.length > 1 && guard++ < 200) {
+    const max = Math.max(...atk.map(a => a.troops));
+    const tied = atk.filter(a => a.troops === max);
     if (tied.length >= 2) {
       for (const p of tied) {
-        const survive = p.troops - Math.floor(p.troops / 2); // 撤退存活的一半
-        retreats[p.team] = (retreats[p.team] || 0) + survive;
+        const back = p.troops - Math.floor(p.troops / 2); // 一半消失、一半撤回
+        retreats[p.team] = (retreats[p.team] || 0) + back;
       }
-      steps.push(`${tied.map(nm).join('、')} 同為最高 ${max} → 互相抵銷，各損一半後出局（存活撤回兵營）`);
-      ps = ps.filter(p => p.troops !== max);   // 同額最高全部喪失攻擊資格
-      continue;
-    }
-    // 唯一最高者勝出
-    const winner = tied[0];
-    const others = ps.filter(p => p !== winner);
-    const runnerUp = others.length ? Math.max(...others.map(p => p.troops)) : 0;
-    const orig = winner.troops;
-    winner.troops = orig - runnerUp;
-    steps.push(`${nm(winner)} 以 ${orig} 勝出（扣次強 ${runnerUp}），${winner.def ? '守住' : '佔領'}，留 ${winner.troops} 兵`);
-    return { winner: winner.troops > 0 ? winner : null, retreats, steps };
+      steps.push(`${tied.map(p => p.team + '隊').join('、')} 同為最高 ${max} → 互相抵銷（一半消失、一半撤回兵營），喪失攻擊資格`);
+      atk = atk.filter(a => a.troops !== max);
+    } else break; // 出現唯一最高攻方
   }
-  return { winner: null, retreats, steps };
+
+  let challenger = null;
+  if (atk.length >= 1) {
+    atk.sort((a, b) => b.troops - a.troops);
+    challenger = atk[0];
+    const losers = atk.slice(1);
+    if (losers.length) steps.push(`${losers.map(p => p.team + '隊').join('、')} 未突圍，進攻失敗（全滅）`);
+  }
+
+  // 第二階段：突圍者 vs 守軍
+  if (!challenger) {
+    if (defTroops > 0) { steps.push(`守方 ${defTeam}隊 無人突圍，守住（留 ${defTroops} 兵）`); return { outcome: { type: 'hold', troops: defTroops }, retreats, steps }; }
+    steps.push('攻方全數抵銷，成無人空島');
+    return { outcome: { type: 'neutral' }, retreats, steps };
+  }
+  if (defTroops === 0) {
+    steps.push(`${challenger.team}隊 以 ${challenger.troops} 兵佔領無守軍島嶼（留 ${challenger.troops}）`);
+    return { outcome: { type: 'capture', team: challenger.team, troops: challenger.troops }, retreats, steps };
+  }
+  if (challenger.troops > defTroops) {
+    const left = challenger.troops - defTroops;
+    steps.push(`${challenger.team}隊 ${challenger.troops} 攻破守軍 ${defTroops}，佔領（扣守軍後留 ${left} 兵）`);
+    return { outcome: { type: 'capture', team: challenger.team, troops: left }, retreats, steps };
+  }
+  if (challenger.troops < defTroops) {
+    const left = defTroops - challenger.troops;
+    steps.push(`守方 ${defTeam}隊 ${defTroops} 擋下 ${challenger.team}隊 ${challenger.troops}，守住（留 ${left} 兵）`);
+    return { outcome: { type: 'hold', troops: left }, retreats, steps };
+  }
+  steps.push(`${challenger.team}隊 ${challenger.troops} 與守軍 ${defTroops} 同歸於盡，成無人空島`);
+  return { outcome: { type: 'neutral' }, retreats, steps };
 }
