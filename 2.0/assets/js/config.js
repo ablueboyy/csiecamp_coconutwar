@@ -18,20 +18,29 @@ export const RULES = {
   HARVEST_COUNT: 2,         // 每回合隨機豐收島數（最後一回合為全島）
 };
 
-// --- 12 座島嶼（5 大 + 7 小），置於海域上 ----------------------
+// --- 14 座島嶼（6 大 + 8 小），置於海域上 ----------------------
+// 黃金洞窟（大）與軍火要塞（小）為初始中立島：開墾設定畫面留「（中立）」即可，
+//   開局無守軍（空島），無特殊產出，佔領後照一般大/小島規則。
+// 4 排錯落分布，平均散開；兩座中立寶島（黃金洞窟／軍火要塞）擺中央供爭奪。
 export const ISLANDS = [
-  { id: 'big1',  label: '大島1', type: 'big',   img: 'IMG_5862.PNG', x: 22, y: 26 },
-  { id: 'big2',  label: '大島2', type: 'big',   img: 'IMG_5863.PNG', x: 50, y: 15 },
-  { id: 'big3',  label: '大島3', type: 'big',   img: 'IMG_5864.PNG', x: 78, y: 26 },
-  { id: 'big4',  label: '大島4', type: 'big',   img: 'IMG_5860.PNG', x: 15, y: 58 },
-  { id: 'big5',  label: '大島5', type: 'big',   img: 'IMG_5861.PNG', x: 85, y: 58 },
-  { id: 'small1', label: '小島1', type: 'small', img: 'IMG_5853.PNG', x: 37, y: 38 },
-  { id: 'small2', label: '小島2', type: 'small', img: 'IMG_5855.PNG', x: 63, y: 38 },
-  { id: 'small3', label: '小島3', type: 'small', img: 'IMG_5856.PNG', x: 33, y: 70 },
-  { id: 'small4', label: '小島4', type: 'small', img: 'IMG_5858.PNG', x: 50, y: 60 },
-  { id: 'small5', label: '小島5', type: 'small', img: 'IMG_5859.PNG', x: 67, y: 70 },
-  { id: 'small6', label: '小島6', type: 'small', img: 'IMG_5854.PNG', x: 8,  y: 40 },
-  { id: 'small7', label: '小島7', type: 'small', img: 'IMG_5857.PNG', x: 92, y: 40 },
+  // 第1排（y=20）
+  { id: 'big1',   label: '河童國',   type: 'big',   img: '河童國.PNG',   x: 12, y: 20 },
+  { id: 'small1', label: '巨人山丘', type: 'small', img: '巨人山丘.PNG', x: 38, y: 20 },
+  { id: 'small2', label: '狐族賭館', type: 'small', img: '狐族賭館.PNG', x: 62, y: 20 },
+  { id: 'big3',   label: '侏儒劇場', type: 'big',   img: '侏儒劇場.PNG', x: 88, y: 20 },
+  // 第2排（y=43）
+  { id: 'small3', label: '機械王國', type: 'small', img: '機械王國.PNG', x: 25, y: 43 },
+  { id: 'big6',   label: '黃金洞窟', type: 'big',   img: '黃金洞窟.PNG', x: 50, y: 43 },
+  { id: 'small4', label: '布丁狗族', type: 'small', img: '布丁狗族.PNG', x: 75, y: 43 },
+  // 第3排（y=65）
+  { id: 'big4',   label: '人類王國', type: 'big',   img: '人類王國.PNG', x: 12, y: 65 },
+  { id: 'small5', label: '哥布林族', type: 'small', img: '哥布林族.PNG', x: 38, y: 65 },
+  { id: 'small8', label: '軍火要塞', type: 'small', img: '軍火要塞.PNG', x: 62, y: 65 },
+  { id: 'big5',   label: '獸人荒原', type: 'big',   img: '獸人荒原.PNG', x: 88, y: 65 },
+  // 第4排（y=87）
+  { id: 'small6', label: '龍族火山', type: 'small', img: '龍族火山.PNG', x: 25, y: 87 },
+  { id: 'big2',   label: '傀儡族',   type: 'big',   img: '傀儡族.PNG',   x: 50, y: 87 },
+  { id: 'small7', label: '精靈森域', type: 'small', img: '精靈森域.PNG', x: 75, y: 87 },
 ];
 
 export const IMG_BASE = 'island/';

@@ -27,7 +27,7 @@ export function initGame({ numTeams, numRounds, ownership, totals }) {
 
   for (let i = 0; i < numTeams; i++) {
     const c = TEAM_COLORS[i % TEAM_COLORS.length];
-    GAME.teams[i] = { id: i, name: `${i} 隊`, color: c.hex, colorName: c.name, barracks: 0, coconuts: 0 };
+    GAME.teams[i] = { id: i, name: `${i} 小`, color: c.hex, colorName: c.name, barracks: 0, coconuts: 0 };
     GAME.pending[i] = [];
   }
 
@@ -94,10 +94,15 @@ export function teamTotalTroops(teamId) {
 }
 // 開墾加成（椰子/回合）
 export function cultBonus(loc) { return loc.cult || 0; }
+// 島嶼本回合椰子產出 = 基礎(大800/小500) + 開墾加成，豐收島再 ×1.5
+export function islandYield(loc) {
+  const base = RULES.YIELD[loc.type] + (loc.cult || 0);
+  return isHarvest(loc.id) ? Math.round(base * RULES.HARVEST_MULT) : base;
+}
 
 // 出發地：兵營 + 己方島嶼
 export function sourcesForTeam(teamId) {
-  const out = [{ key: 'B', label: `${teamId}隊 專屬兵營`, troops: GAME.teams[teamId].barracks }];
+  const out = [{ key: 'B', label: '兵營', troops: GAME.teams[teamId].barracks }];
   for (const loc of Object.values(GAME.locations)) {
     if (loc.owner === teamId && (loc.garrison[teamId] || 0) > 0) {
       out.push({ key: loc.id, label: loc.label, troops: loc.garrison[teamId] });

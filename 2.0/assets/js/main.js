@@ -18,7 +18,8 @@ async function handleSettle() {
   if (btn) { btn.disabled = true; btn.textContent = '結算中…'; }
 
   const log = settleRound();
-  bus.postMessage({ type: 'settle', log });
+  // 一併帶結算後 state，播放視窗才能在攻擊階段結束時同步島嶼歸屬
+  bus.postMessage({ type: 'settle', log, state: exportState() });
   await playSettlement(log);
 
   if (GAME.round >= GAME.numRounds) {
@@ -45,7 +46,7 @@ bus.onmessage = (e) => {
   const m = e.data;
   if (VIEW === 'control') { if (m.type === 'hello') broadcastState(); return; }
   if (m.type === 'state') { loadState(m.state); renderGame(root, { view: 'display' }); }
-  else if (m.type === 'settle') { playSettlement(m.log); }
+  else if (m.type === 'settle') { playSettlement(m.log, m.state); }
   else if (m.type === 'final') { loadState(m.state); renderFinal(root); }
 };
 

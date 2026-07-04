@@ -2,11 +2,13 @@
  * COCONUT WARS 2.0 — 介面渲染 + 結算動畫
  * ========================================================= */
 import { ISLANDS, IMG_BASE, RULES, DEFAULT_TEAMS, DEFAULT_ROUNDS } from './config.js';
-import { GAME, garrisonTotal, teamTotalTroops, isHarvest, isFinalRound, sourcesForTeam, ownIslands } from './state.js';
+import { GAME, garrisonTotal, teamTotalTroops, isHarvest, isFinalRound, sourcesForTeam, ownIslands, islandYield, loadState } from './state.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 手繪椰子小圖（取代 🥥）；height:1.1em 會隨所在文字大小自動縮放
+const COCO = '<img class="coco-ic" src="assets/img/coconut.png" alt="椰子">';
 
 const LOC_ALIAS = (() => {
   const m = {};
@@ -23,8 +25,10 @@ export function renderSetup(root, onStart) {
   root.innerHTML = '';
   root.className = '';
   const wrap = el('div', 'setup');
-  wrap.appendChild(el('h1', 'title', '🥥 COCONUT WARS 2.0'));
+  wrap.appendChild(el('h1', 'title', `${COCO} COCONUT WARS 2.0`));
   wrap.appendChild(el('p', 'subtitle', '開墾版 · 工作人員後台系統'));
+  wrap.appendChild(el('div', 'setup-hero',
+    '<img class="hero-bird" src="assets/img/bird-run.png" alt=""><img class="hero-coco" src="assets/img/coconut.png" alt="">'));
 
   const card = el('div', 'card');
   card.innerHTML = `
@@ -52,7 +56,7 @@ export function renderSetup(root, onStart) {
 
 function renderAssign(card, numTeams, numRounds, onStart) {
   const teamOpts = ['<option value="">（中立）</option>'];
-  for (let i = 0; i < numTeams; i++) teamOpts.push(`<option value="${i}">${i} 隊</option>`);
+  for (let i = 0; i < numTeams; i++) teamOpts.push(`<option value="${i}">${i} 小</option>`);
 
   let islandRows = '';
   for (const isl of ISLANDS) {
@@ -65,7 +69,7 @@ function renderAssign(card, numTeams, numRounds, onStart) {
   }
   let totalRows = '';
   for (let i = 0; i < numTeams; i++) {
-    totalRows += `<label class="total-item">${i} 隊 總兵力
+    totalRows += `<label class="total-item">${i} 小 總兵力
       <input type="number" data-total="${i}" min="0" step="100" value="3000"></label>`;
   }
 
@@ -73,7 +77,7 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     <h2>② 島嶼歸屬（大地遊戲結束時的佔領狀態）</h2>
     <div class="assign-grid">${islandRows}</div>
     <h2>③ 各隊累積總兵力</h2>
-    <p class="hint">大島擁有者島上自動 +${RULES.BIG_ISLAND_TROOPS} 駐軍、小島 +${RULES.SMALL_ISLAND_TROOPS}；其餘放入專屬兵營。</p>
+    <p class="hint">大島擁有者島上自動 +${RULES.BIG_ISLAND_TROOPS} 駐軍、小島 +${RULES.SMALL_ISLAND_TROOPS}；其餘放入兵營。</p>
     <div class="total-grid">${totalRows}</div>
     <button id="startBtn" class="btn primary big">🏝️ 開始遊戲</button>`;
 
@@ -104,7 +108,7 @@ export function renderGame(root, opts = {}) {
        <button id="settleBtn" class="btn primary">結算本回合 ▸</button>`
     : '<span class="tag open">播放視窗</span>';
   bar.innerHTML = `
-    <div class="tb-left">🥥 <b>COCONUT WARS 2.0</b>${view === 'display' ? ' · 戰況直播' : ' · 主控台'}</div>
+    <div class="tb-left">${COCO} <b>COCONUT WARS 2.0</b>${view === 'display' ? ' · 戰況直播' : ' · 主控台'}</div>
     <div class="tb-mid">第 <b>${GAME.round}</b> / ${GAME.numRounds} 回合 ${harvestTxt}</div>
     <div class="tb-right">${rightBtns}</div>`;
   root.appendChild(bar);
@@ -129,7 +133,7 @@ export function renderWaiting(root) {
   root.innerHTML = '';
   root.className = 'app-shell';
   const w = el('div', 'waiting');
-  w.innerHTML = `<div class="waiting-inner"><div class="wait-emoji">🏝️</div>
+  w.innerHTML = `<div class="waiting-inner"><img class="wait-img" src="assets/img/bird-run.png" alt="">
     <h1 class="title">COCONUT WARS 2.0 戰況直播</h1>
     <p class="subtitle">等待主控端開始遊戲…</p></div>`;
   root.appendChild(w);
@@ -167,16 +171,19 @@ function renderBoard(board) {
     node.style.top = (isl.y * ISLAND_ZONE + 2).toFixed(2) + '%';
     node.style.setProperty('--owner', owner ? owner.color : '#9fb6c2');
 
-    const ownerTxt = owner ? `${owner.id}隊 · ⚔${total}` : '空島';
+    const ownerTxt = owner ? `${owner.id}小 · ⚔${total}` : '空島';
     const cultTxt = loc.cult ? `<span class="isl-cult">🌴+${loc.cult}</span>` : '';
+    const yieldC = islandYield(loc);
+    const yieldTxt = `<div class="isl-yield${harvest ? ' harvest' : ''}">${COCO}${yieldC}/回合</div>`;
     const garrDetail = Object.entries(loc.garrison)
-      .map(([t, n]) => `<span style="color:${GAME.teams[t].color}">${t}隊 ${n}</span>`).join('　') || '—';
+      .map(([t, n]) => `<span style="color:${GAME.teams[t].color}">${t}小 ${n}</span>`).join('　') || '—';
 
     node.innerHTML = `
       ${harvest ? '<div class="harvest-badge">🌾×1.5</div>' : ''}
       <img src="${IMG_BASE}${loc.img}" alt="${loc.label}" draggable="false">
       <div class="isl-tag">${loc.label}</div>
       <div class="isl-owner"><span class="dot" style="background:${owner ? owner.color : '#cfd8dc'}"></span>${ownerTxt}${cultTxt}</div>
+      ${yieldTxt}
       <div class="isl-pop"><b>${loc.label}</b> · ${loc.type === 'big' ? '大島' : '小島'}
         ${loc.cult ? `· 開墾 +${loc.cult}/回合` : ''}<br>駐軍：${garrDetail}</div>`;
     ocean.appendChild(node);
@@ -186,7 +193,7 @@ function renderBoard(board) {
 
 function renderBeach() {
   const beach = el('div', 'beach');
-  beach.innerHTML = '<div class="beach-label">🏕️ 專屬兵營</div>';
+  beach.innerHTML = '<div class="beach-label">兵營</div>';
   const row = el('div', 'hut-row');
   for (let i = 0; i < GAME.numTeams; i++) {
     const t = GAME.teams[i];
@@ -203,7 +210,7 @@ function renderBeach() {
 function renderSidebar(side, view = 'control') {
   side.innerHTML = '';
   const rank = el('div', 'panel');
-  rank.appendChild(el('h3', null, '🏆 椰子排行'));
+  rank.appendChild(el('h3', null, '<img class="h3-ic" src="assets/img/coconut.png" alt="">椰子排行'));
   rank.appendChild(rankTable());
   side.appendChild(rank);
 
@@ -212,7 +219,7 @@ function renderSidebar(side, view = 'control') {
     cmd.appendChild(el('h3', null, '🎮 回合指令'));
     const teamSel = el('select', 'team-select');
     for (let i = 0; i < GAME.numTeams; i++) {
-      const o = el('option', null, `${i} 隊　（兵營 ${GAME.teams[i].barracks}）`); o.value = i; teamSel.appendChild(o);
+      const o = el('option', null, `${i} 小　（兵營 ${GAME.teams[i].barracks}）`); o.value = i; teamSel.appendChild(o);
     }
     cmd.appendChild(teamSel);
     const builder = el('div', 'builder'); cmd.appendChild(builder);
@@ -233,10 +240,10 @@ function renderSidebar(side, view = 'control') {
 function rankTable() {
   const t = el('table', 'rank-table');
   const rows = Object.values(GAME.teams).map(tm => ({ tm, total: teamTotalTroops(tm.id) })).sort((a, b) => b.tm.coconuts - a.tm.coconuts);
-  t.innerHTML = '<tr><th>#</th><th>隊</th><th>🥥椰子</th><th>總兵力</th></tr>';
+  t.innerHTML = `<tr><th>#</th><th>小隊</th><th>${COCO}椰子</th><th>總兵力</th></tr>`;
   rows.forEach((r, i) => {
     const tr = el('tr');
-    tr.innerHTML = `<td>${i + 1}</td><td><span class="dot" style="background:${r.tm.color}"></span>${r.tm.id}隊</td>
+    tr.innerHTML = `<td>${i + 1}</td><td><span class="dot" style="background:${r.tm.color}"></span>${r.tm.id}小</td>
       <td><b>${r.tm.coconuts}</b></td><td>${r.total}</td>`;
     t.appendChild(tr);
   });
@@ -245,25 +252,25 @@ function rankTable() {
 
 // --- 指令建構器（選 + 打 並存）---------------------------
 const CMD_META = {
-  cultivate: { fmt: '出發, 己方島, 兵力', ex: '兵營, 大島1, 300' },
-  move:      { fmt: '出發, 目的(己方), 兵力', ex: '兵營, 大島1, 300' },
-  attack:    { fmt: '出發, 目標, 兵力', ex: '兵營, 大島2, 300' },
+  cultivate: { fmt: '己方島, 兵力', ex: '河童國, 300' },
+  move:      { fmt: '出發, 目的(己方), 兵力', ex: '兵營, 河童國, 300' },
+  attack:    { fmt: '出發, 目標, 兵力', ex: '兵營, 傀儡族, 300' },
 };
 
 function renderBuilder(box, teamId, onAdd) {
   const srcList = sourcesForTeam(teamId).map(s => `${s.label}(${s.troops})`).join('、');
   box.innerHTML = `
     <div class="templates">
-      <button data-tpl="cultivate" class="btn tpl">🌱 開墾</button>
-      <button data-tpl="move" class="btn tpl">🚶 移動</button>
-      <button data-tpl="attack" class="btn tpl">⚔️ 攻擊</button>
+      <button data-tpl="cultivate" class="btn tpl"><img class="tpl-ic" src="assets/img/cultivate.png" alt="">開墾</button>
+      <button data-tpl="move" class="btn tpl"><img class="tpl-ic" src="assets/img/move.png" alt="">移動</button>
+      <button data-tpl="attack" class="btn tpl"><img class="tpl-ic" src="assets/img/attack.png" alt="">攻擊</button>
     </div>
     <div id="cmdForm" class="cmd-form hidden"></div>
     <details class="ref"><summary>📖 可用名稱參考</summary>
       <div class="ref-body">
         <b>出發地(此隊)：</b>${srcList}<br>
-        <b>島嶼：</b>大島1~5、小島1~7　<b>兵營：</b>輸入「兵營」或「B」<br>
-        <b>開墾：</b>投入多少兵 → 該島每回合永久 +多少椰子（1:1；島被搶走時加成隨島留給新主人）<br>
+        <b>島嶼：</b>見地圖島名（六大島／八小島）　<b>兵營：</b>輸入「兵營」或「B」<br>
+        <b>開墾：</b>用該島現有駐軍開墾，投入多少兵 → 該島每回合永久 +多少椰子（1:1；島被搶走時加成隨島留給新主人）<br>
         <b>攻擊：</b>無最低門檻，100 的倍數即可
       </div>
     </details>`;
@@ -297,12 +304,11 @@ function selectorForm(type, teamId) {
   const nInput = (min, val) => `<input name="n" type="number" step="100" min="${min}" value="${val}">`;
 
   if (type === 'cultivate') return `<div class="frow">
-    <label>出發 <select name="S">${srcOpts}</select></label>
     <label>己方島 <select name="E">${own || '<option value="">（無己方島）</option>'}</select></label>
-    <label>兵力 ${nInput(100, 300)}</label></div>`;
+    <label>兵力（用該島駐軍） ${nInput(100, 100)}</label></div>`;
   if (type === 'move') return `<div class="frow">
     <label>出發 <select name="S">${srcOpts}</select></label>
-    <label>目的 <select name="E"><option value="B">${teamId}隊 兵營</option>${own}</select></label>
+    <label>目的 <select name="E"><option value="B">兵營</option>${own}</select></label>
     <label>兵力 ${nInput(100, 100)}</label></div>`;
   if (type === 'attack') return `<div class="frow">
     <label>出發 <select name="S">${srcOpts}</select></label>
@@ -314,13 +320,24 @@ function selectorForm(type, teamId) {
 function collectSelector(type, form, teamId) {
   const scope = form.querySelector('.mode-pick');
   const g = name => { const e = scope.querySelector(`[name="${name}"]`); return e ? e.value : ''; };
-  const cmd = { type, S: g('S') || null, E: g('E') || null, n: +g('n') || 0, team: teamId };
+  const E = g('E') || null;
+  // 開墾以該島現有駐軍進行，來源即該島本身
+  const S = type === 'cultivate' ? E : (g('S') || null);
+  const cmd = { type, S, E, n: +g('n') || 0, team: teamId };
   const err = validateCmd(cmd, teamId);
   return err ? { error: err } : { cmd };
 }
 
 function parseCommand(type, text, teamId) {
   const toks = String(text).replace(/[()（）\[\]]/g, ' ').split(/[,，\s]+/).filter(Boolean);
+  if (type === 'cultivate') {
+    if (toks.length < 2) return { error: `格式：${CMD_META.cultivate.fmt}` };
+    const E = resolveLoc(toks[0]), n = +toks[1];
+    if (!E) return { error: `找不到島「${toks[0]}」` };
+    const cmd = { type, S: E, E, n, team: teamId };  // 開墾來源即該島本身
+    const err = validateCmd(cmd, teamId);
+    return err ? { error: err } : { cmd };
+  }
   if (toks.length < 3) return { error: `格式：${CMD_META[type].fmt}` };
   const S = resolveLoc(toks[0]), E = resolveLoc(toks[1]), n = +toks[2];
   if (!S) return { error: `找不到出發地「${toks[0]}」` };
@@ -337,7 +354,11 @@ function validateCmd(c, teamId) {
     if (c.n < RULES.MIN_ATTACK) return `進攻最低 ${RULES.MIN_ATTACK} 兵`;
     if (GAME.locations[c.E]?.owner === teamId) return '不能攻擊自己的島';
   }
-  if (c.type === 'cultivate' && GAME.locations[c.E]?.owner !== teamId) return '只能開墾自己的島';
+  if (c.type === 'cultivate') {
+    const loc = GAME.locations[c.E];
+    if (!loc || loc.owner !== teamId) return '只能開墾自己的島';
+    if (c.n > (loc.garrison[teamId] || 0)) return `開墾兵力不能超過該島駐軍（${loc.garrison[teamId] || 0}）`;
+  }
   if (c.type === 'move' && c.E !== 'B' && GAME.locations[c.E]?.owner !== teamId) return '只能移動到自己的島或兵營';
   return null;
 }
@@ -355,7 +376,7 @@ function renderCmdList(box, teamId, onChange) {
 
 function cmdText(c) {
   const L = k => k === 'B' ? '兵營' : (GAME.locations[k]?.label || k);
-  if (c.type === 'cultivate') return `🌱 開墾 ${L(c.S)}→${L(c.E)} ${c.n}`;
+  if (c.type === 'cultivate') return `🌱 開墾 ${L(c.E)} ${c.n}`;
   if (c.type === 'move') return `🚶 移動 ${L(c.S)}→${L(c.E)} ${c.n}`;
   if (c.type === 'attack') return `⚔️ 攻擊 ${L(c.S)}→${L(c.E)} ${c.n}`;
   return c.type;
@@ -367,7 +388,7 @@ function renderLog(log) {
   sec('🌱 開墾階段', log.cultivate);
   sec('🚶 移動階段', log.move);
   sec('⚔️ 攻擊階段', log.attack);
-  sec('🥥 資源發放', log.resource);
+  sec(`${COCO} 資源發放`, log.resource);
   sec('📌 其他判定', log.notes);
   if (!log.cultivate.length && !log.move.length && !log.attack.length && !log.notes.length)
     box.appendChild(el('div', 'log-line', '本回合無任何操作。'));
@@ -377,7 +398,7 @@ function renderLog(log) {
 // ---------------------------------------------------------
 // 結算動畫
 // ---------------------------------------------------------
-export async function playSettlement(log) {
+export async function playSettlement(log, postState) {
   const events = log.events || [];
   const notes = log.notes || [];
   const overlay = el('div', 'anim-overlay');
@@ -392,7 +413,7 @@ export async function playSettlement(log) {
     { key: 'cultivate', label: '🌱 開墾階段', color: '#3cb371' },
     { key: 'move', label: '🚶 移動階段', color: '#2a9df4' },
     { key: 'attack', label: '⚔️ 攻擊階段', color: '#ff6f61' },
-    { key: 'resource', label: '🥥 資源結算', color: '#ffc23c' },
+    { key: 'resource', label: `${COCO} 資源結算`, color: '#ffc23c' },
   ];
   const feedLines = {
     cultivate: log.cultivate || [],
@@ -410,6 +431,12 @@ export async function playSettlement(log) {
     await showBanner(banner, ph.label, ph.color);
     appendFeed(feedBody, ph.label, lines, ph.color);
     await playPhase(overlay, ph.key, evs);
+    // 攻擊結束即更新島嶼歸屬（不等資源結算）；播放視窗用帶過來的結算後 state
+    if (ph.key === 'attack') {
+      if (postState) loadState(postState);
+      const board = document.getElementById('board');
+      if (board) { renderBoard(board); fitOcean(); }
+    }
     await sleep(650);
   }
   if (!any) { appendFeed(feedBody, '本回合無任何操作', [], '#0b6e99'); await sleep(600); }
@@ -429,7 +456,7 @@ function appendFeed(feedBody, title, lines, color) {
 }
 
 async function showBanner(banner, text, color) {
-  banner.textContent = text; banner.style.background = color;
+  banner.innerHTML = text; banner.style.background = color;
   banner.classList.remove('show'); void banner.offsetWidth; banner.classList.add('show');
   await sleep(1200);
 }
@@ -459,9 +486,9 @@ function centerOf(id) { const n = document.getElementById(id); if (!n) return nu
 function moveToken(overlay, e, kind) {
   const from = centerOf(e.from), to = centerOf(e.to); if (!from || !to) return;
   const color = GAME.teams[e.team]?.color || '#fff';
-  const icon = kind === 'seed' ? '🌱' : kind === 'sword' ? '⚔️' : '🏃';
+  const src = kind === 'seed' ? 'cultivate.png' : kind === 'sword' ? 'attack.png' : 'move.png';
   const tok = el('div', 'token'); tok.style.setProperty('--c', color);
-  tok.innerHTML = `<span class="tok-icon">${icon}</span><b>${e.n}</b>`;
+  tok.innerHTML = `<img class="tok-icon" src="assets/img/${src}" alt=""><b>${e.n}</b>`;
   tok.style.left = from.x + 'px'; tok.style.top = from.y + 'px';
   overlay.appendChild(tok); void tok.offsetWidth;
   tok.style.left = to.x + 'px'; tok.style.top = to.y + 'px'; tok.style.opacity = '1';
@@ -477,7 +504,7 @@ function burst(overlay, at) {
 function riseCoconut(overlay, at, coconut, harvest) {
   const c = centerOf(at); if (!c) return;
   const r = el('div', 'coconut-rise' + (harvest ? ' harvest' : ''));
-  r.innerHTML = `🥥+${coconut}${harvest ? ' 🌾' : ''}`;
+  r.innerHTML = `${COCO}+${coconut}${harvest ? ' 🌾' : ''}`;
   r.style.left = c.x + 'px'; r.style.top = c.y + 'px';
   overlay.appendChild(r); void r.offsetWidth; r.classList.add('show');
   setTimeout(() => r.remove(), 1400);
@@ -488,13 +515,14 @@ export function renderFinal(root) {
   root.innerHTML = ''; root.className = '';
   const wrap = el('div', 'final');
   wrap.appendChild(el('h1', 'title', '🏁 最終排名'));
+  wrap.appendChild(el('div', 'final-hero', '<img src="assets/img/bird-drink.png" alt="">'));
   const rows = Object.values(GAME.teams).sort((a, b) => b.coconuts - a.coconuts);
   const podium = el('div', 'podium');
   rows.forEach((tm, i) => {
     const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
     const row = el('div', 'final-row'); row.style.borderColor = tm.color;
     row.innerHTML = `<span class="fr-medal">${medal}</span><span class="dot" style="background:${tm.color}"></span>
-      <span class="fr-name">${tm.id} 隊</span><span class="fr-score">🥥 ${tm.coconuts}</span>`;
+      <span class="fr-name">${tm.id} 小</span><span class="fr-score">${COCO} ${tm.coconuts}</span>`;
     podium.appendChild(row);
   });
   wrap.appendChild(podium);

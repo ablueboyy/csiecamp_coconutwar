@@ -190,12 +190,11 @@ input[type=number] { width: 96px; }
 
 /* ---------- 地圖下方沙灘 + 兵營帳篷 ---------- */
 .beach {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 27%;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
   background:
     radial-gradient(circle at 12% 60%, rgba(255,255,255,.35) 0 3px, transparent 4px),
     radial-gradient(circle at 78% 45%, rgba(255,255,255,.3) 0 2px, transparent 3px),
     linear-gradient(180deg, rgba(88,196,224,.15) 0%, #f6dca0 16%, #eec981 100%);
-  border-top: 3px dashed rgba(255,255,255,.6);
   display: flex; flex-direction: column; justify-content: flex-end; padding: 0 2% 2.4%;
 }
 .beach-label { font-family: "Baloo 2"; font-weight: 800; color: #7a5a1e; font-size: 15px; margin: 0 0 6px 6px; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
@@ -280,7 +279,7 @@ input[type=number] { width: 96px; }
   transition: left 1.3s cubic-bezier(.4,.05,.35,1), top 1.3s cubic-bezier(.4,.05,.35,1), opacity .4s, transform .4s;
   filter: drop-shadow(0 3px 4px rgba(0,0,0,.35));
 }
-.token .tok-icon { font-size: 26px; }
+.token .tok-icon { height: 42px; width: auto; }
 .token b {
   font-family: "Baloo 2"; font-size: 11px; color: #fff; background: var(--c);
   padding: 0 6px; border-radius: 999px; margin-top: -3px; box-shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -322,5 +321,37 @@ input[type=number] { width: 96px; }
 }
 @keyframes harvestPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 .isl-cult { margin-left: 5px; color: #2e7d32; font-weight: 800; }
+.isl-yield {
+  display: inline-block; margin-top: 2px;
+  font-family: "Baloo 2"; font-weight: 800; font-size: 10px;
+  background: #eafff2; color: #1b7a43;
+  padding: 0 6px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  white-space: nowrap;
+}
+.isl-yield.harvest { background: #fff2c2; color: #a06a00; box-shadow: 0 0 6px #ffd24a, 0 1px 3px rgba(0,0,0,.2); }
+.view-display .isl-yield { font-size: 12px; }
 
 .coconut-rise.harvest { background: #fff2c2; color: #a06a00; box-shadow: 0 0 10px #ffd24a, 0 3px 8px rgba(0,0,0,.2); }
+
+/* ========== 手繪素材：指令圖示 + 裝飾鳥 ========== */
+.btn.tpl { display: inline-flex; align-items: center; gap: 6px; }
+.tpl-ic {
+  height: 26px; width: auto; max-width: 46px; object-fit: contain;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.15)); pointer-events: none;
+}
+
+.setup-hero { display: flex; justify-content: center; align-items: flex-end; gap: 26px; margin: 6px 0 22px; }
+.setup-hero img { width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,.18)); }
+.setup-hero .hero-bird { height: 118px; animation: bob 2.6s ease-in-out infinite; }
+.setup-hero .hero-coco { height: 96px; }
+
+.final-hero { text-align: center; margin: 4px 0 16px; }
+.final-hero img { height: 150px; width: auto; animation: bob 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,.18)); }
+
+.h3-ic { height: 22px; width: auto; vertical-align: -5px; margin-right: 5px; }
+/* 隨字級縮放的椰子小圖（取代 🥥）*/
+.coco-ic { height: 1.1em; width: auto; vertical-align: -0.18em; }
+
+.wait-img { width: 180px; height: auto; animation: bob 2s ease-in-out infinite;
+  filter: drop-shadow(0 8px 10px rgba(0,0,0,.2)); }

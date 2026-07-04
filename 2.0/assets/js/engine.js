@@ -7,6 +7,9 @@
 import { RULES } from './config.js';
 import { GAME, garrisonTotal, isHarvest } from './state.js';
 
+// 手繪椰子小圖（取代 🥥）；結算戰報只會以 innerHTML 呈現，可安全內嵌
+const COCO = '<img class="coco-ic" src="assets/img/coconut.png" alt="椰子">';
+
 // 指令：{ type:'cultivate'|'move'|'attack', S, E, n, team }
 
 export function settleRound() {
@@ -45,44 +48,44 @@ export function settleRound() {
     }
     const valid = [], invalid = [];
     for (const c of cmds) (bad.has(`${c.team}|${c.S}`) ? invalid : valid).push(c);
-    for (const c of invalid) log.notes.push(`↩️ ${c.team}隊 ${c.type} 自 ${labelOf(c.S)} 兵力超支，作廢`);
+    for (const c of invalid) log.notes.push(`↩️ ${c.team}小 ${c.type} 自 ${labelOf(c.S)} 兵力超支，作廢`);
     return valid;
   };
 
   // ---------- ① 開墾階段 ----------
   const cCmds = filterOverdraft(byType('cultivate').filter(c => {
     const loc = GAME.locations[c.E];
-    if (!loc || loc.owner !== c.team) { log.notes.push(`↩️ ${c.team}隊 開墾 ${labelOf(c.E)} 非己方領地，作廢`); return false; }
+    if (!loc || loc.owner !== c.team) { log.notes.push(`↩️ ${c.team}小 開墾 ${labelOf(c.E)} 非己方領地，作廢`); return false; }
     return true;
   }));
   for (const c of cCmds) {
     deduct(c.team, c.S, c.n);
     const add = Math.round(c.n * RULES.CULTIVATE_RATIO);
     cult[c.E] += add;
-    log.cultivate.push(`🌱 ${c.team}隊 開墾 ${labelOf(c.E)} 投入 ${c.n} 兵 → 每回合 +${add} 椰子`);
+    log.cultivate.push(`🌱 ${c.team}小 開墾 ${labelOf(c.E)} 投入 ${c.n} 兵 → 每回合 +${add} 椰子`);
     log.events.push({ phase: 'cultivate', kind: 'seed', from: elOf(c.team, c.S), to: elIsl(c.E), team: c.team, n: c.n });
   }
 
   // ---------- ② 移動階段 ----------
   const mCmds = filterOverdraft(byType('move').filter(c => {
     const dest = c.E === 'B' ? true : (GAME.locations[c.E]?.owner === c.team);
-    if (!dest) { log.notes.push(`↩️ ${c.team}隊 移動至 ${labelOf(c.E)} 非己方領地，作廢`); return false; }
-    if (c.n % RULES.STEP) { log.notes.push(`↩️ ${c.team}隊 移動非 100 倍數，作廢`); return false; }
+    if (!dest) { log.notes.push(`↩️ ${c.team}小 移動至 ${labelOf(c.E)} 非己方領地，作廢`); return false; }
+    if (c.n % RULES.STEP) { log.notes.push(`↩️ ${c.team}小 移動非 100 倍數，作廢`); return false; }
     return true;
   }));
   for (const c of mCmds) {
     deduct(c.team, c.S, c.n);
     if (c.E === 'B') barracks[c.team] += c.n;
     else garrison[c.E][c.team] = (garrison[c.E][c.team] || 0) + c.n;
-    log.move.push(`🚶 ${c.team}隊 ${labelOf(c.S)} → ${labelOf(c.E)}（${c.n}）`);
+    log.move.push(`🚶 ${c.team}小 ${labelOf(c.S)} → ${labelOf(c.E)}（${c.n}）`);
     log.events.push({ phase: 'move', kind: 'person', from: elOf(c.team, c.S), to: elOf(c.team, c.E), team: c.team, n: c.n });
   }
 
   // ---------- ③ 攻擊階段 ----------
   const aCmds = filterOverdraft(byType('attack').filter(c => {
     if (!GAME.locations[c.E]) return false;
-    if (GAME.locations[c.E].owner === c.team) { log.notes.push(`↩️ ${c.team}隊 不能攻擊自己的 ${labelOf(c.E)}，作廢`); return false; }
-    if (c.n < RULES.MIN_ATTACK || c.n % RULES.STEP) { log.notes.push(`↩️ ${c.team}隊 進攻兵力不合門檻，作廢`); return false; }
+    if (GAME.locations[c.E].owner === c.team) { log.notes.push(`↩️ ${c.team}小 不能攻擊自己的 ${labelOf(c.E)}，作廢`); return false; }
+    if (c.n < RULES.MIN_ATTACK || c.n % RULES.STEP) { log.notes.push(`↩️ ${c.team}小 進攻兵力不合門檻，作廢`); return false; }
     return true;
   }));
   // 依目標彙整攻方（同隊多路相加），並扣除來源
@@ -110,8 +113,8 @@ export function settleRound() {
 
     for (const s of steps) log.attack.push(`【${loc.label}】${s}`);
     log.events.push({ phase: 'attack', kind: 'clash', at: elIsl(E),
-      result: outcome.type === 'capture' ? `${outcome.team}隊佔領 ${loc.label}（剩 ${outcome.troops}）`
-        : outcome.type === 'hold' ? `${defTeam}隊守住 ${loc.label}` : `${loc.label} 成空島` });
+      result: outcome.type === 'capture' ? `${outcome.team}小佔領 ${loc.label}（剩 ${outcome.troops}）`
+        : outcome.type === 'hold' ? `${defTeam}小守住 ${loc.label}` : `${loc.label} 成空島` });
   }
 
   // 回寫戰後狀態
@@ -132,7 +135,7 @@ export function settleRound() {
     const harvest = isHarvest(loc.id);
     if (harvest) yieldC = Math.round(yieldC * RULES.HARVEST_MULT);
     GAME.teams[owner].coconuts += yieldC;
-    log.resource.push(`🥥 ${loc.label} 產出 ${yieldC} 椰子${harvest ? '（🌾豐收 ×1.5）' : ''} → ${owner}隊`);
+    log.resource.push(`${COCO} ${loc.label} 產出 ${yieldC} 椰子${harvest ? '（🌾豐收 ×1.5）' : ''} → ${owner}小`);
     log.events.push({ phase: 'resource', kind: 'coconut', at: `isl-${loc.id}`, coconut: yieldC, harvest });
   }
 
@@ -170,7 +173,7 @@ function resolveBattle(attackList, defTeam, defTroops) {
         const back = p.troops - Math.floor(p.troops / 2); // 一半消失、一半撤回
         retreats[p.team] = (retreats[p.team] || 0) + back;
       }
-      steps.push(`${tied.map(p => p.team + '隊').join('、')} 同為最高 ${max} → 互相抵銷（一半消失、一半撤回兵營），喪失攻擊資格`);
+      steps.push(`${tied.map(p => p.team + '小').join('、')} 同為最高 ${max} → 互相抵銷（一半消失、一半撤回兵營），喪失攻擊資格`);
       atk = atk.filter(a => a.troops !== max);
     } else break; // 出現唯一最高攻方
   }
@@ -180,29 +183,29 @@ function resolveBattle(attackList, defTeam, defTroops) {
     atk.sort((a, b) => b.troops - a.troops);
     challenger = atk[0];
     const losers = atk.slice(1);
-    if (losers.length) steps.push(`${losers.map(p => p.team + '隊').join('、')} 未突圍，進攻失敗（全滅）`);
+    if (losers.length) steps.push(`${losers.map(p => p.team + '小').join('、')} 未突圍，進攻失敗（全滅）`);
   }
 
   // 第二階段：突圍者 vs 守軍
   if (!challenger) {
-    if (defTroops > 0) { steps.push(`守方 ${defTeam}隊 無人突圍，守住（留 ${defTroops} 兵）`); return { outcome: { type: 'hold', troops: defTroops }, retreats, steps }; }
+    if (defTroops > 0) { steps.push(`守方 ${defTeam}小 無人突圍，守住（留 ${defTroops} 兵）`); return { outcome: { type: 'hold', troops: defTroops }, retreats, steps }; }
     steps.push('攻方全數抵銷，成無人空島');
     return { outcome: { type: 'neutral' }, retreats, steps };
   }
   if (defTroops === 0) {
-    steps.push(`${challenger.team}隊 以 ${challenger.troops} 兵佔領無守軍島嶼（留 ${challenger.troops}）`);
+    steps.push(`${challenger.team}小 以 ${challenger.troops} 兵佔領無守軍島嶼（留 ${challenger.troops}）`);
     return { outcome: { type: 'capture', team: challenger.team, troops: challenger.troops }, retreats, steps };
   }
   if (challenger.troops > defTroops) {
     const left = challenger.troops - defTroops;
-    steps.push(`${challenger.team}隊 ${challenger.troops} 攻破守軍 ${defTroops}，佔領（扣守軍後留 ${left} 兵）`);
+    steps.push(`${challenger.team}小 ${challenger.troops} 攻破守軍 ${defTroops}，佔領（扣守軍後留 ${left} 兵）`);
     return { outcome: { type: 'capture', team: challenger.team, troops: left }, retreats, steps };
   }
   if (challenger.troops < defTroops) {
     const left = defTroops - challenger.troops;
-    steps.push(`守方 ${defTeam}隊 ${defTroops} 擋下 ${challenger.team}隊 ${challenger.troops}，守住（留 ${left} 兵）`);
+    steps.push(`守方 ${defTeam}小 ${defTroops} 擋下 ${challenger.team}小 ${challenger.troops}，守住（留 ${left} 兵）`);
     return { outcome: { type: 'hold', troops: left }, retreats, steps };
   }
-  steps.push(`${challenger.team}隊 ${challenger.troops} 與守軍 ${defTroops} 同歸於盡，成無人空島`);
+  steps.push(`${challenger.team}小 ${challenger.troops} 與守軍 ${defTroops} 同歸於盡，成無人空島`);
   return { outcome: { type: 'neutral' }, retreats, steps };
 }
