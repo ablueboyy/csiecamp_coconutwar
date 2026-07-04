@@ -10,7 +10,7 @@ export const RULES = {
   BIG_ISLAND_TROOPS: 1000,  // 大島初始駐軍
   SMALL_ISLAND_TROOPS: 500,
   // 每回合基礎椰子產出（未開墾也有的被動收入）
-  YIELD: { big: 500, small: 300 },
+  YIELD: { big: 800, small: 500 },
   // 開墾：每投入 1 兵 → 該島每回合永久 +CULTIVATE_RATIO 椰子（1:1）
   CULTIVATE_RATIO: 1,
   // 豐收
