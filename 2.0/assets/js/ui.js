@@ -263,7 +263,8 @@ function renderBuilder(box, teamId, onAdd) {
       <div class="ref-body">
         <b>出發地(此隊)：</b>${srcList}<br>
         <b>島嶼：</b>大島1~5、小島1~7　<b>兵營：</b>輸入「兵營」或「B」<br>
-        <b>開墾：</b>每 100 兵 → 該島每回合永久 +${RULES.CULTIVATE_PER_100} 椰子（島被搶走時加成隨島留給新主人）
+        <b>開墾：</b>投入多少兵 → 該島每回合永久 +多少椰子（1:1；島被搶走時加成隨島留給新主人）<br>
+        <b>攻擊：</b>無最低門檻，100 的倍數即可
       </div>
     </details>`;
 
@@ -306,7 +307,7 @@ function selectorForm(type, teamId) {
   if (type === 'attack') return `<div class="frow">
     <label>出發 <select name="S">${srcOpts}</select></label>
     <label>目標 <select name="E">${enemy}</select></label>
-    <label>兵力 ${nInput(300, 300)}</label></div>`;
+    <label>兵力 ${nInput(100, 100)}</label></div>`;
   return '';
 }
 

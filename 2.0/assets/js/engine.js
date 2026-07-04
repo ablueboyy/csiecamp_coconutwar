@@ -57,7 +57,7 @@ export function settleRound() {
   }));
   for (const c of cCmds) {
     deduct(c.team, c.S, c.n);
-    const add = Math.floor(c.n / 100) * RULES.CULTIVATE_PER_100;
+    const add = Math.round(c.n * RULES.CULTIVATE_RATIO);
     cult[c.E] += add;
     log.cultivate.push(`🌱 ${c.team}隊 開墾 ${labelOf(c.E)} 投入 ${c.n} 兵 → 每回合 +${add} 椰子`);
     log.events.push({ phase: 'cultivate', kind: 'seed', from: elOf(c.team, c.S), to: elIsl(c.E), team: c.team, n: c.n });

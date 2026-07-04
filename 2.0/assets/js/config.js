@@ -5,14 +5,14 @@
  * ========================================================= */
 
 export const RULES = {
-  MIN_ATTACK: 300,          // 進攻最低門檻
+  MIN_ATTACK: 100,          // 進攻最低（無門檻限制，只需 100 的倍數）
   STEP: 100,                // 兵力單位
   BIG_ISLAND_TROOPS: 1000,  // 大島初始駐軍
   SMALL_ISLAND_TROOPS: 500,
-  // 每回合基礎椰子產出
+  // 每回合基礎椰子產出（未開墾也有的被動收入）
   YIELD: { big: 500, small: 300 },
-  // 開墾：每投入 100 兵 → 該島每回合永久 +CULTIVATE_PER_100 椰子
-  CULTIVATE_PER_100: 30,
+  // 開墾：每投入 1 兵 → 該島每回合永久 +CULTIVATE_RATIO 椰子（1:1）
+  CULTIVATE_RATIO: 1,
   // 豐收
   HARVEST_MULT: 1.5,
   HARVEST_COUNT: 2,         // 每回合隨機豐收島數（最後一回合為全島）
