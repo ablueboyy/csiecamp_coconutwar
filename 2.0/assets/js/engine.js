@@ -103,19 +103,17 @@ export function settleRound() {
     const defTroops = defTeam != null ? (garrison[E][defTeam] || 0) : 0;
     if (defTroops > 0) parties.push({ team: defTeam, troops: defTroops, def: true });
 
-    const res = resolveBattle(parties);
-    if (!res.winner) {
-      garrison[E] = {};
-      loc.owner = null;
-      log.attack.push(`⚔️ ${loc.label} 各方同歸於盡，成為無人空島`);
-    } else {
-      const w = res.winner;
-      garrison[E] = { [w.team]: w.troops };
-      loc.owner = w.team;
-      if (w.def) log.attack.push(`🛡️ ${w.team}隊 成功守住 ${loc.label}（剩 ${w.troops} 兵）`);
-      else log.attack.push(`💥 ${w.team}隊 攻下 ${loc.label}！留 ${w.troops} 兵駐守（敗方全滅）`);
-    }
-    log.events.push({ phase: 'attack', kind: 'clash', at: elIsl(E), result: log.attack[log.attack.length - 1] });
+    const { winner, retreats, steps } = resolveBattle(parties);
+    // 抵銷後撤退的兵 → 回到兵營
+    for (const [t, n] of Object.entries(retreats)) barracks[t] = (barracks[t] || 0) + n;
+
+    if (!winner) { garrison[E] = {}; loc.owner = null; }
+    else { garrison[E] = { [winner.team]: winner.troops }; loc.owner = winner.team; }
+
+    for (const s of steps) log.attack.push(`【${loc.label}】${s}`);
+    if (!winner) log.attack.push(`【${loc.label}】各方抵銷殆盡，成為無人空島`);
+    log.events.push({ phase: 'attack', kind: 'clash', at: elIsl(E),
+      result: winner ? `${winner.team}隊佔領 ${loc.label}（剩 ${winner.troops}）` : `${loc.label} 成空島` });
   }
 
   // 回寫戰後狀態
@@ -146,24 +144,44 @@ export function settleRound() {
 }
 
 // ---------------------------------------------------------
-// 攻擊裁決：同額最高者各損一半，直到出現唯一最高者
-// 回傳 { winner: {team, troops, def} | null(全滅) }
+// 攻擊裁決
+// ・找出目前最高兵力；若「同為最高」有多方 → 這些方各損一半後喪失攻擊資格
+//   （存活的一半撤回兵營），再往下一層比。
+// ・直到出現「唯一最高者」→ 勝出，扣掉次強者的兵力後留駐該島；其餘落敗者全滅。
+// 回傳 { winner:{team,troops,def}|null, retreats:{team:n}, steps:[文字] }
 // ---------------------------------------------------------
 function resolveBattle(parties) {
   let ps = parties.filter(p => p.troops > 0).map(p => ({ ...p }));
-  if (ps.length === 0) return { winner: null };
-  if (ps.length === 1) return { winner: ps[0] };
+  const retreats = {}, steps = [];
+  const nm = p => `${p.team}隊${p.def ? '(守)' : ''}`;
+  if (ps.length === 0) return { winner: null, retreats, steps };
 
   let guard = 0;
-  while (guard++ < 100) {
+  while (guard++ < 200) {
+    if (ps.length === 1) {
+      const w = ps[0];
+      steps.push(`${nm(w)} 無對手，${w.def ? '守住' : '佔領'}，留 ${w.troops} 兵`);
+      return { winner: w, retreats, steps };
+    }
     const max = Math.max(...ps.map(p => p.troops));
     const tied = ps.filter(p => p.troops === max);
-    if (tied.length === 1) return { winner: tied[0] };
-    if (tied.length === ps.length) return { winner: null }; // 全體同額 → 同歸於盡
-    for (const p of tied) p.troops = Math.floor(p.troops / 2);
-    ps = ps.filter(p => p.troops > 0);
-    if (ps.length === 1) return { winner: ps[0] };
-    if (ps.length === 0) return { winner: null };
+    if (tied.length >= 2) {
+      for (const p of tied) {
+        const survive = p.troops - Math.floor(p.troops / 2); // 撤退存活的一半
+        retreats[p.team] = (retreats[p.team] || 0) + survive;
+      }
+      steps.push(`${tied.map(nm).join('、')} 同為最高 ${max} → 互相抵銷，各損一半後出局（存活撤回兵營）`);
+      ps = ps.filter(p => p.troops !== max);   // 同額最高全部喪失攻擊資格
+      continue;
+    }
+    // 唯一最高者勝出
+    const winner = tied[0];
+    const others = ps.filter(p => p !== winner);
+    const runnerUp = others.length ? Math.max(...others.map(p => p.troops)) : 0;
+    const orig = winner.troops;
+    winner.troops = orig - runnerUp;
+    steps.push(`${nm(winner)} 以 ${orig} 勝出（扣次強 ${runnerUp}），${winner.def ? '守住' : '佔領'}，留 ${winner.troops} 兵`);
+    return { winner: winner.troops > 0 ? winner : null, retreats, steps };
   }
-  return { winner: null };
+  return { winner: null, retreats, steps };
 }
