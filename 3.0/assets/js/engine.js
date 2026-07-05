@@ -12,7 +12,19 @@ const COCO = '<img class="coco-ic" src="assets/img/coconut.png" alt="椰子">';
 // 指令：{ type:'move'|'attack'|'train', S, E, n, team }
 
 export function settleRound() {
-  const log = { round: GAME.round, move: [], attack: [], train: [], resource: [], notes: [], events: [] };
+  const log = { round: GAME.round, move: [], attack: [], train: [], resource: [], notes: [], events: [], battles: [], recap: [] };
+
+  // 回合開始快照（給「本回合回顧」用）
+  const preOwner = {};
+  for (const [id, loc] of Object.entries(GAME.locations)) preOwner[id] = loc.owner;
+  const preCoco = {}, preTroop = {};
+  for (const [tid, t] of Object.entries(GAME.teams)) {
+    preCoco[tid] = t.coconuts;
+    let s = t.barracks;
+    for (const loc of Object.values(GAME.locations)) s += loc.garrison[tid] || 0;
+    preTroop[tid] = s;
+  }
+
   const elBrk = t => `brk-${t}`;
   const elIsl = id => `isl-${id}`;
   const elOf = (team, key) => key === 'B' ? elBrk(team) : elIsl(key);
@@ -107,6 +119,13 @@ export function settleRound() {
     else if (outcome.type === 'capture') { garrison[E] = { [outcome.team]: outcome.troops }; loc.owner = outcome.team; }
 
     for (const s of steps) log.attack.push(`【${loc.label}】${s}`);
+    // 結構化戰役資料（給主持人「對戰揭曉」畫面）
+    log.battles.push({
+      island: E, label: loc.label,
+      attackers: attackList.map(a => ({ team: a.team, troops: a.troops })),
+      defTeam: defTroops > 0 ? defTeam : null, defTroops,
+      steps, outcome,
+    });
     log.events.push({ phase: 'attack', kind: 'clash', at: elIsl(E),
       result: outcome.type === 'capture' ? `${outcome.team}小佔領 ${loc.label}（剩 ${outcome.troops}）`
         : outcome.type === 'hold' ? `${defTeam}小守住 ${loc.label}` : `${loc.label} 成空島` });
@@ -155,6 +174,22 @@ export function settleRound() {
     log.resource.push(`${COCO} ${loc.label} 產出 ${yieldC} 椰子${harvest ? '（🌾豐收 ×1.5）' : ''} → ${owner}小`);
     log.events.push({ phase: 'resource', kind: 'coconut', at: `isl-${loc.id}`, coconut: yieldC, harvest });
   }
+
+  // ---------- 本回合回顧（各隊得失）----------
+  log.recap = Object.values(GAME.teams).map(t => {
+    const gained = [], lost = [];
+    for (const [id, loc] of Object.entries(GAME.locations)) {
+      if (loc.owner === t.id && preOwner[id] !== t.id) gained.push(loc.label);
+      if (preOwner[id] === t.id && loc.owner !== t.id) lost.push(loc.label);
+    }
+    let after = t.barracks;
+    for (const loc of Object.values(GAME.locations)) after += loc.garrison[t.id] || 0;
+    return {
+      team: t.id, gained, lost,
+      coconutGained: t.coconuts - (preCoco[t.id] || 0), coconutTotal: t.coconuts,
+      troopBefore: preTroop[t.id] || 0, troopAfter: after,
+    };
+  });
 
   GAME.log = log;
   for (const k of Object.keys(GAME.pending)) GAME.pending[k] = [];

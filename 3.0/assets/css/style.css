@@ -362,3 +362,55 @@ input[type=number] { width: 96px; }
   transition: transform 1.3s ease-out, opacity 1.3s;
 }
 .train-rise.show { transform: translate(-50%, -150%); opacity: 1; }
+
+/* ========== 3.0：主持人步進結算畫面 ========== */
+.settle-overlay {
+  position: fixed; inset: 0; z-index: 1500; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 45%, rgba(10,30,40,.30), rgba(8,24,32,.55));
+}
+.settle-card {
+  pointer-events: none; background: var(--card, #fffaf0);
+  border: 5px solid var(--accent, #0b6e99); border-radius: 26px;
+  padding: 26px 40px; max-width: min(820px, 88vw); max-height: 84vh; overflow: hidden;
+  text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.4);
+  animation: cardPop .28s cubic-bezier(.2,1.5,.5,1);
+}
+@keyframes cardPop { from { transform: scale(.86); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.sc-title { font-family: "Baloo 2"; font-weight: 800; font-size: clamp(24px, 3.4vw, 42px); color: var(--accent); line-height: 1.2; }
+.sc-big { font-family: "Baloo 2"; font-weight: 800; font-size: clamp(40px, 6.5vw, 76px); color: var(--ink); margin: 4px 0 6px; }
+.sc-lines { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sc-line { font-family: "Baloo 2"; font-weight: 700; font-size: clamp(19px, 2.6vw, 32px); color: var(--ink); line-height: 1.5; }
+.sc-line .coco-ic { height: 1em; vertical-align: -0.14em; }
+
+.settle-nav {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 1600;
+  pointer-events: auto; display: flex; align-items: center; gap: 14px;
+  background: rgba(255,255,255,.94); padding: 8px 10px 8px 18px; border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.28);
+}
+.settle-hint { font-size: 14px; color: #6a5f48; font-weight: 600; }
+.settle-hint b { color: var(--coral-deep); }
+.settle-prog { font-family: "Baloo 2"; font-weight: 800; color: var(--sea-deep); font-size: 15px; }
+.settle-next { font-size: 16px; padding: 10px 22px; }
+
+/* 回合回顧表 */
+.recap-table { width: 100%; border-collapse: collapse; font-size: clamp(14px, 1.7vw, 21px); margin-top: 14px; }
+.recap-table th { color: #9a8a68; font-weight: 700; border-bottom: 2px solid var(--sand-deep); padding: 5px 8px; text-align: left; }
+.recap-table td { padding: 6px 8px; border-bottom: 1px dashed #eadfc4; text-align: left; white-space: nowrap; }
+.recap-table .dot { width: 12px; height: 12px; }
+.rc-isl { white-space: normal; }
+.rc-gain { color: #1c8a4e; font-weight: 700; }
+.rc-lost { color: var(--coral-deep); font-weight: 700; }
+.rc-none { color: #b9ad92; }
+.rc-coco { font-family: "Baloo 2"; font-weight: 800; color: #7a5a1e; }
+.rc-coco .coco-ic { height: 1em; vertical-align: -0.14em; }
+.rc-delta { color: #1c8a4e; font-size: .8em; }
+.rc-troop { font-family: "Baloo 2"; font-weight: 700; color: var(--coral-deep); }
+
+/* 佔領閃光 */
+.island.flash-cap { animation: capFlash 1.4s ease; z-index: 25; }
+@keyframes capFlash {
+  0%,100% { filter: none; }
+  30%,60% { filter: drop-shadow(0 0 14px #ffd24a) drop-shadow(0 0 8px #fff); transform: translate(-50%,-50%) scale(1.14); }
+}

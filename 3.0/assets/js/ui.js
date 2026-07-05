@@ -392,96 +392,142 @@ function renderLog(log) {
 }
 
 // ---------------------------------------------------------
-// 結算動畫
+// 結算：主持人步進模式（手動一步步揭曉；播放視窗同步）
 // ---------------------------------------------------------
-export async function playSettlement(log, postState) {
-  const events = log.events || [];
-  const notes = log.notes || [];
-  const overlay = el('div', 'anim-overlay');
-  const banner = el('div', 'phase-banner');
-  const feed = el('div', 'anim-feed');
-  feed.innerHTML = '<div class="feed-title">📢 結算實況</div><div class="feed-body"></div>';
-  overlay.appendChild(banner); overlay.appendChild(feed);
+let SETTLE = null;
+
+// 由 log 建出「一格一格」的節目單（控端與播放端建出的完全相同）
+function buildBeats(log) {
+  const beats = [];
+  const harvestLine = isFinalRound()
+    ? '🌾 最後一回合 · 全島大豐收 ×1.5'
+    : `🌾 本回合豐收：${GAME.harvest.map(id => GAME.locations[id].label).join('、')}（×1.5）`;
+  beats.push({ type: 'intro', title: `第 ${log.round} 回合`, big: '開戰！', lines: [harvestLine], color: '#0b6e99' });
+
+  const moveEvents = (log.events || []).filter(e => e.phase === 'move');
+  if (moveEvents.length) beats.push({ type: 'move', title: '🚶 移動階段', lines: log.move, moveEvents, color: '#2a9df4' });
+
+  for (const b of (log.battles || [])) {
+    const swordEvents = (log.events || []).filter(e => e.phase === 'attack' && e.kind === 'sword' && e.to === `isl-${b.island}`);
+    const atkLine = b.attackers.map(a => `${a.team}小 ${a.troops}`).join('　') || '（無）';
+    const defLine = b.defTroops > 0 ? `🛡️ 守軍 ${b.defTeam}小 ${b.defTroops}` : '🛡️（此島無守軍）';
+    beats.push({ type: 'battle-intro', island: b.island, title: `⚔️ ${b.label} 爭奪戰`,
+      lines: [`參戰：${atkLine}`, defLine], swordEvents, color: '#ff6f61' });
+    b.steps.forEach((s, i) => {
+      const last = i === b.steps.length - 1;
+      beats.push({ type: 'battle-step', island: b.island, title: `⚔️ ${b.label}`, lines: [s], color: '#ff6f61', capture: last ? b.outcome : null });
+    });
+  }
+
+  if ((log.train || []).length) beats.push({ type: 'train', title: '🏋️ 訓練階段', lines: log.train, trainEvents: (log.events || []).filter(e => e.phase === 'train'), color: '#3cb371' });
+  if ((log.resource || []).length) beats.push({ type: 'resource', title: `${COCO} 資源結算`, lines: log.resource, coconutEvents: (log.events || []).filter(e => e.phase === 'resource'), color: '#ffc23c' });
+  beats.push({ type: 'recap', title: '📊 本回合回顧', recap: log.recap || [], color: '#0b6e99' });
+
+  const upd = beats.find(bt => bt.type === 'train' || bt.type === 'resource' || bt.type === 'recap');
+  if (upd) upd.updateBoard = true;
+  return beats;
+}
+
+// control = 主持人可步進；display = 只顯示、被 beat 訊息驅動
+export function openSettlement(log, postState, control, cbs) {
+  closeSettlement();
+  const beats = buildBeats(log);
+  const overlay = el('div', 'settle-overlay');
+  const card = el('div', 'settle-card');
+  overlay.appendChild(card);
+  let nav = null;
+  if (control) {
+    nav = el('div', 'settle-nav');
+    nav.innerHTML = `<span class="settle-hint">按 <b>空白鍵</b> 或點「下一步」揭曉</span>
+      <span class="settle-prog"></span><button class="btn primary settle-next">下一步 ▸</button>`;
+    overlay.appendChild(nav);
+  }
   document.body.appendChild(overlay);
-  const feedBody = feed.querySelector('.feed-body');
+  SETTLE = { beats, overlay, card, nav, i: -1, postState, control, cbs, boardDone: false };
 
-  const phases = [
-    { key: 'move', label: '🚶 移動階段', color: '#2a9df4' },
-    { key: 'attack', label: '⚔️ 攻擊階段', color: '#ff6f61' },
-    { key: 'train', label: '🏋️ 訓練階段', color: '#3cb371' },
-    { key: 'resource', label: `${COCO} 資源結算`, color: '#ffc23c' },
-  ];
-  const feedLines = {
-    move: log.move || [],
-    attack: (log.attack || []).concat(notes),
-    train: log.train || [],
-    resource: log.resource || [],
-  };
-
-  let any = false;
-  for (const ph of phases) {
-    const evs = events.filter(e => e.phase === ph.key);
-    const lines = feedLines[ph.key] || [];
-    if (!evs.length && !lines.length) continue;
-    any = true;
-    await showBanner(banner, ph.label, ph.color);
-    appendFeed(feedBody, ph.label, lines, ph.color);
-    await playPhase(overlay, ph.key, evs);
-    // 攻擊結束即更新島嶼歸屬與兵營；播放視窗用帶過來的結算後 state
-    if (ph.key === 'attack') {
-      if (postState) loadState(postState);
-      const board = document.getElementById('board');
-      if (board) { renderBoard(board); fitOcean(); }
-    }
-    await sleep(650);
+  if (control) {
+    const next = () => advanceSettlement();
+    nav.querySelector('.settle-next').onclick = next;
+    SETTLE.key = e => { if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); next(); } };
+    window.addEventListener('keydown', SETTLE.key);
   }
-  if (!any) { appendFeed(feedBody, '本回合無任何操作', [], '#0b6e99'); await sleep(600); }
-
-  await showBanner(banner, '✅ 結算完成', '#0b6e99');
-  await sleep(1600);
-  overlay.remove();
+  showBeat(0);
 }
 
-function appendFeed(feedBody, title, lines, color) {
-  const grp = el('div', 'feed-group');
-  grp.innerHTML = `<div class="feed-h" style="color:${color}">${title}</div>`;
-  (lines.length ? lines : ['—']).forEach(t => grp.appendChild(el('div', 'feed-line', t)));
-  feedBody.appendChild(grp);
-  void grp.offsetWidth; grp.classList.add('show');
-  feedBody.scrollTop = feedBody.scrollHeight;
+function advanceSettlement() {
+  if (!SETTLE) return;
+  const ni = SETTLE.i + 1;
+  if (ni >= SETTLE.beats.length) { const cbs = SETTLE.cbs; closeSettlement(); if (cbs && cbs.onFinish) cbs.onFinish(); return; }
+  showBeat(ni);
+  if (SETTLE.cbs && SETTLE.cbs.onAdvance) SETTLE.cbs.onAdvance(ni);
 }
 
-async function showBanner(banner, text, color) {
-  banner.innerHTML = text; banner.style.background = color;
-  banner.classList.remove('show'); void banner.offsetWidth; banner.classList.add('show');
-  await sleep(1200);
+// 播放端：收到 beat 索引 → 顯示同一格
+export function showSettlementBeat(i) { if (SETTLE) showBeat(i); }
+export function closeSettlement() {
+  if (!SETTLE) return;
+  if (SETTLE.key) window.removeEventListener('keydown', SETTLE.key);
+  SETTLE.overlay.remove();
+  SETTLE = null;
 }
 
-async function playPhase(overlay, key, evs) {
-  if (key === 'resource') {
-    for (const e of evs) riseCoconut(overlay, e.at, e.coconut, e.harvest);
-    await sleep(1900); return;
+function showBeat(i) {
+  if (!SETTLE) return;
+  SETTLE.i = i;
+  const b = SETTLE.beats[i];
+  renderCard(SETTLE.card, b);
+  if (SETTLE.nav) {
+    SETTLE.nav.querySelector('.settle-prog').textContent = `${i + 1} / ${SETTLE.beats.length}`;
+    SETTLE.nav.querySelector('.settle-next').textContent = i === SETTLE.beats.length - 1 ? '完成 ✓' : '下一步 ▸';
   }
-  if (key === 'train') {
-    for (const e of evs) riseTrain(overlay, e.at, e.gain);
-    await sleep(1700); return;
-  }
-  if (key === 'attack') {
-    const swords = evs.filter(e => e.kind === 'sword');
-    const clashes = evs.filter(e => e.kind === 'clash');
-    await travelTokens(overlay, swords, 'sword');
-    await sleep(200);
-    for (const c of clashes) burst(overlay, c.at);
-    await sleep(1600); return;
-  }
-  await travelTokens(overlay, evs, 'person');
+  applyBeatEffects(b);
 }
 
-async function travelTokens(overlay, evs, kind) {
-  if (!evs.length) return;
-  evs.forEach((e, i) => setTimeout(() => moveToken(overlay, e, kind), i * 240));
-  await sleep(evs.length * 240 + 1500);
+function applyBeatEffects(b) {
+  if (b.updateBoard && !SETTLE.boardDone) {
+    SETTLE.boardDone = true;
+    if (SETTLE.postState) loadState(SETTLE.postState);
+    const board = document.getElementById('board');
+    if (board) { renderBoard(board); requestAnimationFrame(fitOcean); }
+  }
+  const ov = SETTLE.overlay;
+  if (b.type === 'move' && b.moveEvents) b.moveEvents.forEach((e, i) => setTimeout(() => moveToken(ov, e, 'person'), i * 200));
+  if (b.type === 'battle-intro' && b.swordEvents) b.swordEvents.forEach((e, i) => setTimeout(() => moveToken(ov, e, 'sword'), i * 200));
+  if (b.type === 'battle-step' && b.capture) { burst(ov, `isl-${b.island}`); flashIsland(b.island); }
+  if (b.type === 'train' && b.trainEvents) b.trainEvents.forEach(e => riseTrain(ov, e.at, e.gain));
+  if (b.type === 'resource' && b.coconutEvents) b.coconutEvents.forEach((e, i) => setTimeout(() => riseCoconut(ov, e.at, e.coconut, e.harvest), i * 80));
 }
+
+function flashIsland(id) {
+  const n = document.getElementById(`isl-${id}`); if (!n) return;
+  n.classList.remove('flash-cap'); void n.offsetWidth; n.classList.add('flash-cap');
+  setTimeout(() => n.classList.remove('flash-cap'), 1400);
+}
+
+function renderCard(card, b) {
+  card.style.setProperty('--accent', b.color || '#0b6e99');
+  if (b.type === 'recap') { card.innerHTML = renderRecapCard(b.recap); return; }
+  const linesHtml = (b.lines || []).map(l => `<div class="sc-line">${l}</div>`).join('');
+  const bigHtml = b.big ? `<div class="sc-big">${b.big}</div>` : '';
+  card.innerHTML = `<div class="sc-title">${b.title}</div>${bigHtml}<div class="sc-lines">${linesHtml}</div>`;
+}
+
+function renderRecapCard(recap) {
+  const rows = [...recap].sort((a, b) => b.coconutTotal - a.coconutTotal).map(r => {
+    const c = GAME.teams[r.team]?.color || '#888';
+    const gain = r.gained.length ? `<span class="rc-gain">＋${r.gained.join('、')}</span>` : '';
+    const lost = r.lost.length ? `<span class="rc-lost">－${r.lost.join('、')}</span>` : '';
+    const chg = (!gain && !lost) ? '<span class="rc-none">—</span>' : `${gain} ${lost}`;
+    return `<tr>
+      <td><span class="dot" style="background:${c}"></span>${r.team}小</td>
+      <td class="rc-isl">${chg}</td>
+      <td class="rc-coco">${COCO}${r.coconutTotal} <span class="rc-delta">+${r.coconutGained}</span></td>
+      <td class="rc-troop">⚔${r.troopAfter}</td></tr>`;
+  }).join('');
+  return `<div class="sc-title">📊 本回合回顧</div>
+    <table class="recap-table"><tr><th>隊</th><th>島嶼變化</th><th>椰子（+本回合）</th><th>總兵力</th></tr>${rows}</table>`;
+}
+
 function centerOf(id) { const n = document.getElementById(id); if (!n) return null; const r = n.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 function moveToken(overlay, e, kind) {
   const from = centerOf(e.from), to = centerOf(e.to); if (!from || !to) return;
