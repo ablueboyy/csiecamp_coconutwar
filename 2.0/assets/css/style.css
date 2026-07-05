@@ -117,8 +117,8 @@ input[type=number] { width: 96px; }
 .island:hover { transform: translate(-50%, -50%) scale(1.12); z-index: 20; }
 .island.small { width: calc(var(--u, 700px) * 0.11); }
 .island.money, .island.arsenal { width: calc(var(--u, 700px) * 0.13); }
-.island img { width: 100%; filter: drop-shadow(0 6px 6px rgba(0,0,0,.28)); user-select: none; }
-.island.locked img { filter: grayscale(1) brightness(.45) drop-shadow(0 4px 4px rgba(0,0,0,.4)); }
+.island > img { width: 100%; filter: drop-shadow(0 6px 6px rgba(0,0,0,.28)); user-select: none; }
+.island.locked > img { filter: grayscale(1) brightness(.45) drop-shadow(0 4px 4px rgba(0,0,0,.4)); }
 .isl-tag {
   display: inline-block; font-family: "Baloo 2"; font-weight: 700; font-size: 12px;
   background: #fff; color: var(--ink); padding: 1px 8px; border-radius: 999px;
@@ -312,7 +312,7 @@ input[type=number] { width: 96px; }
 /* ========== 2.0 專屬：豐收 / 開墾 ========== */
 .tag.harvest { background: #fff2c2; color: #a06a00; }
 .island.harvest .isl-tag { box-shadow: 0 0 0 2px #ffd24a, 0 2px 4px rgba(0,0,0,.2); }
-.island.harvest img { filter: drop-shadow(0 0 8px #ffd24a) drop-shadow(0 6px 6px rgba(0,0,0,.28)); }
+.island.harvest > img { filter: drop-shadow(0 0 8px #ffd24a) drop-shadow(0 6px 6px rgba(0,0,0,.28)); }
 .harvest-badge {
   position: absolute; top: -6px; right: 6px; z-index: 5;
   font-family: "Baloo 2"; font-weight: 800; font-size: 11px; color: #7a5200;
