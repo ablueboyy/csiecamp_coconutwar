@@ -1,5 +1,5 @@
 /* =========================================================
- * COCONUT WARS 2.0 — 介面渲染 + 結算動畫
+ * COCONUT WARS 3.0 — 介面渲染 + 結算動畫
  * ========================================================= */
 import { ISLANDS, IMG_BASE, RULES, DEFAULT_TEAMS, DEFAULT_ROUNDS } from './config.js';
 import { GAME, garrisonTotal, teamTotalTroops, isHarvest, isFinalRound, sourcesForTeam, ownIslands, islandYield, loadState } from './state.js';
@@ -7,7 +7,6 @@ import { GAME, garrisonTotal, teamTotalTroops, isHarvest, isFinalRound, sourcesF
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-// 手繪椰子小圖（取代 🥥）；height:1.1em 會隨所在文字大小自動縮放
 const COCO = '<img class="coco-ic" src="assets/img/coconut.png" alt="椰子">';
 
 const LOC_ALIAS = (() => {
@@ -25,8 +24,8 @@ export function renderSetup(root, onStart) {
   root.innerHTML = '';
   root.className = '';
   const wrap = el('div', 'setup');
-  wrap.appendChild(el('h1', 'title', `${COCO} COCONUT WARS 2.0`));
-  wrap.appendChild(el('p', 'subtitle', '開墾版 · 工作人員後台系統'));
+  wrap.appendChild(el('h1', 'title', `${COCO} COCONUT WARS 3.0`));
+  wrap.appendChild(el('p', 'subtitle', '訓練版 · 工作人員後台系統'));
   wrap.appendChild(el('div', 'setup-hero',
     '<img class="hero-bird" src="assets/img/bird-run.png" alt=""><img class="hero-coco" src="assets/img/coconut.png" alt="">'));
 
@@ -37,7 +36,7 @@ export function renderSetup(root, onStart) {
       <label>小隊數量 <input id="numTeams" type="number" min="2" max="10" value="${DEFAULT_TEAMS}"></label>
       <label>回合數量 <input id="numRounds" type="number" min="1" max="8" value="${DEFAULT_ROUNDS}"></label>
     </div>
-    <p class="hint">小隊編號為 0 ~ 小隊數-1。指令：開墾 / 移動 / 攻擊。每回合 2 島豐收 ×1.5，最後一回合全島大豐收。</p>
+    <p class="hint">小隊編號為 0 ~ 小隊數-1。指令：移動 / 攻擊 / 訓練。每回合 2 島豐收 ×1.5，最後一回合全島大豐收。</p>
     <button id="genBtn" class="btn primary">產生島嶼分配表 ▸</button>`;
   wrap.appendChild(card);
 
@@ -77,7 +76,7 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     <h2>② 島嶼歸屬（大地遊戲結束時的佔領狀態）</h2>
     <div class="assign-grid">${islandRows}</div>
     <h2>③ 各隊累積總兵力</h2>
-    <p class="hint">大島擁有者島上自動 +${RULES.BIG_ISLAND_TROOPS} 駐軍、小島 +${RULES.SMALL_ISLAND_TROOPS}；其餘放入兵營。</p>
+    <p class="hint">總兵力<b>全數放入兵營</b>；每座己方島嶼<b>額外 +${RULES.INIT_ISLAND_TROOPS} 駐軍</b>（大小島皆同、不從總兵力扣）。</p>
     <div class="total-grid">${totalRows}</div>
     <button id="startBtn" class="btn primary big">🏝️ 開始遊戲</button>`;
 
@@ -108,7 +107,7 @@ export function renderGame(root, opts = {}) {
        <button id="settleBtn" class="btn primary">結算本回合 ▸</button>`
     : '<span class="tag open">播放視窗</span>';
   bar.innerHTML = `
-    <div class="tb-left">${COCO} <b>COCONUT WARS 2.0</b>${view === 'display' ? ' · 戰況直播' : ' · 主控台'}</div>
+    <div class="tb-left">${COCO} <b>COCONUT WARS 3.0</b>${view === 'display' ? ' · 戰況直播' : ' · 主控台'}</div>
     <div class="tb-mid">第 <b>${GAME.round}</b> / ${GAME.numRounds} 回合 ${harvestTxt}</div>
     <div class="tb-right">${rightBtns}</div>`;
   root.appendChild(bar);
@@ -134,7 +133,7 @@ export function renderWaiting(root) {
   root.className = 'app-shell';
   const w = el('div', 'waiting');
   w.innerHTML = `<div class="waiting-inner"><img class="wait-img" src="assets/img/bird-run.png" alt="">
-    <h1 class="title">COCONUT WARS 2.0 戰況直播</h1>
+    <h1 class="title">COCONUT WARS 3.0 戰況直播</h1>
     <p class="subtitle">等待主控端開始遊戲…</p></div>`;
   root.appendChild(w);
 }
@@ -172,7 +171,6 @@ function renderBoard(board) {
     node.style.setProperty('--owner', owner ? owner.color : '#9fb6c2');
 
     const ownerTxt = owner ? `${owner.id}小 · ⚔${total}` : '空島';
-    const cultTxt = loc.cult ? `<span class="isl-cult">🌴+${loc.cult}</span>` : '';
     const yieldC = islandYield(loc);
     const yieldTxt = `<div class="isl-yield${harvest ? ' harvest' : ''}">${COCO}${yieldC}/回合</div>`;
     const garrDetail = Object.entries(loc.garrison)
@@ -182,10 +180,9 @@ function renderBoard(board) {
       ${harvest ? '<div class="harvest-badge">🌾×1.5</div>' : ''}
       <img src="${IMG_BASE}${loc.img}" alt="${loc.label}" draggable="false">
       <div class="isl-tag">${loc.label}</div>
-      <div class="isl-owner"><span class="dot" style="background:${owner ? owner.color : '#cfd8dc'}"></span>${ownerTxt}${cultTxt}</div>
+      <div class="isl-owner"><span class="dot" style="background:${owner ? owner.color : '#cfd8dc'}"></span>${ownerTxt}</div>
       ${yieldTxt}
-      <div class="isl-pop"><b>${loc.label}</b> · ${loc.type === 'big' ? '大島' : '小島'}
-        ${loc.cult ? `· 開墾 +${loc.cult}/回合` : ''}<br>駐軍：${garrDetail}</div>`;
+      <div class="isl-pop"><b>${loc.label}</b> · ${loc.type === 'big' ? '大島' : '小島'}<br>駐軍：${garrDetail}</div>`;
     ocean.appendChild(node);
   }
   ocean.appendChild(renderBeach());
@@ -250,28 +247,28 @@ function rankTable() {
   return t;
 }
 
-// --- 指令建構器（選 + 打 並存）---------------------------
+// --- 指令建構器 -----------------------------------------
 const CMD_META = {
-  cultivate: { fmt: '己方島, 兵力', ex: '河童國, 300' },
-  move:      { fmt: '出發, 目的(己方), 兵力', ex: '兵營, 河童國, 300' },
-  attack:    { fmt: '出發, 目標, 兵力', ex: '兵營, 傀儡族, 300' },
+  move:   { fmt: `出發, 目的(己方), 兵力（首回合不限，之後≤${RULES.MOVE_MAX}）`, ex: `兵營, 河童國, ${RULES.MOVE_MAX}` },
+  attack: { fmt: '出發, 目標, 兵力', ex: '兵營, 傀儡族, 300' },
+  train:  { fmt: '（無參數）', ex: '' },
 };
 
 function renderBuilder(box, teamId, onAdd) {
   const srcList = sourcesForTeam(teamId).map(s => `${s.label}(${s.troops})`).join('、');
   box.innerHTML = `
     <div class="templates">
-      <button data-tpl="cultivate" class="btn tpl"><img class="tpl-ic" src="assets/img/cultivate.png" alt="">開墾</button>
       <button data-tpl="move" class="btn tpl"><img class="tpl-ic" src="assets/img/move.png" alt="">移動</button>
       <button data-tpl="attack" class="btn tpl"><img class="tpl-ic" src="assets/img/attack.png" alt="">攻擊</button>
+      <button data-tpl="train" class="btn tpl"><img class="tpl-ic" src="assets/img/bird-run.png" alt="">訓練</button>
     </div>
     <div id="cmdForm" class="cmd-form hidden"></div>
     <details class="ref"><summary>📖 可用名稱參考</summary>
       <div class="ref-body">
         <b>出發地(此隊)：</b>${srcList}<br>
         <b>島嶼：</b>見地圖島名（六大島／八小島）　<b>兵營：</b>輸入「兵營」或「B」<br>
-        <b>開墾：</b>用該島現有駐軍開墾，投入多少兵 → 該島每回合永久 +多少椰子（1:1；島被搶走時加成隨島留給新主人）<br>
-        <b>攻擊：</b>無最低門檻，100 的倍數即可
+        <b>移動：</b>第一回合不限；之後每指令最多 ${RULES.MOVE_MAX} 兵　<b>攻擊：</b>無門檻、100 倍數<br>
+        <b>訓練：</b>兵營每滿 ${RULES.TRAIN_UNIT} 兵 +${RULES.TRAIN_GAIN}（每回合最多一次）
       </div>
     </details>`;
 
@@ -280,15 +277,28 @@ function renderBuilder(box, teamId, onAdd) {
       const type = btn.dataset.tpl, m = CMD_META[type];
       const form = $('#cmdForm', box);
       form.classList.remove('hidden');
+      const push = res => { if (res.error) { flash(form, res.error); return; } GAME.pending[teamId].push(res.cmd); onAdd(); };
+
+      if (type === 'train') {
+        form.innerHTML = `
+          <div class="form-title"><b>訓練</b>：兵營每滿 ${RULES.TRAIN_UNIT} 兵 +${RULES.TRAIN_GAIN}（每回合最多一次）</div>
+          <button class="btn primary add-train">＋ 加入訓練指令</button><div class="flash"></div>`;
+        $('.add-train', form).onclick = () => {
+          if (GAME.pending[teamId].length >= 3) { flash(form, '每回合最多 3 個指令'); return; }
+          if (GAME.pending[teamId].some(c => c.type === 'train')) { flash(form, '訓練每回合最多一次'); return; }
+          push({ cmd: { type: 'train', S: null, E: null, n: 0, team: teamId } });
+        };
+        return;
+      }
+
       form.innerHTML = `
-        <div class="form-title"><b>${type}</b>　格式：<code>${m.fmt}</code></div>
+        <div class="form-title"><b>${type === 'move' ? '移動' : '攻擊'}</b>　格式：<code>${m.fmt}</code></div>
         <div class="mode-pick"><div class="mode-cap">🖱️ 用選的</div>${selectorForm(type, teamId)}
           <button class="btn primary add-sel">＋ 加入</button></div>
         <div class="mode-type"><div class="mode-cap">⌨️ 或用打的</div>
           <div class="type-row"><input class="cmd-typed" type="text" placeholder="例：${m.ex}">
             <button class="btn primary add-typed">＋ 加入</button></div></div>
         <div class="flash"></div>`;
-      const push = res => { if (res.error) { flash(form, res.error); return; } GAME.pending[teamId].push(res.cmd); onAdd(); };
       $('.add-sel', form).onclick = () => push(collectSelector(type, form, teamId));
       const input = $('.cmd-typed', form);
       $('.add-typed', form).onclick = () => push(parseCommand(type, input.value, teamId));
@@ -301,43 +311,31 @@ function selectorForm(type, teamId) {
   const srcOpts = sourcesForTeam(teamId).map(s => `<option value="${s.key}">${s.label}（${s.troops}）</option>`).join('');
   const own = ownIslands(teamId).map(i => `<option value="${i.id}">${i.label}</option>`).join('');
   const enemy = ISLANDS.filter(i => GAME.locations[i.id].owner !== teamId).map(i => `<option value="${i.id}">${i.label}</option>`).join('');
-  const nInput = (min, val) => `<input name="n" type="number" step="100" min="${min}" value="${val}">`;
 
-  if (type === 'cultivate') return `<div class="frow">
-    <label>己方島 <select name="E">${own || '<option value="">（無己方島）</option>'}</select></label>
-    <label>兵力（用該島駐軍） ${nInput(100, 100)}</label></div>`;
-  if (type === 'move') return `<div class="frow">
+  if (type === 'move') {
+    const maxAttr = GAME.round > 1 ? `max="${RULES.MOVE_MAX}"` : '';
+    return `<div class="frow">
     <label>出發 <select name="S">${srcOpts}</select></label>
     <label>目的 <select name="E"><option value="B">兵營</option>${own}</select></label>
-    <label>兵力 ${nInput(100, 100)}</label></div>`;
+    <label>兵力 <input name="n" type="number" step="100" min="100" ${maxAttr} value="${RULES.MOVE_MAX}"></label></div>`;
+  }
   if (type === 'attack') return `<div class="frow">
     <label>出發 <select name="S">${srcOpts}</select></label>
     <label>目標 <select name="E">${enemy}</select></label>
-    <label>兵力 ${nInput(100, 100)}</label></div>`;
+    <label>兵力 <input name="n" type="number" step="100" min="100" value="300"></label></div>`;
   return '';
 }
 
 function collectSelector(type, form, teamId) {
   const scope = form.querySelector('.mode-pick');
   const g = name => { const e = scope.querySelector(`[name="${name}"]`); return e ? e.value : ''; };
-  const E = g('E') || null;
-  // 開墾以該島現有駐軍進行，來源即該島本身
-  const S = type === 'cultivate' ? E : (g('S') || null);
-  const cmd = { type, S, E, n: +g('n') || 0, team: teamId };
+  const cmd = { type, S: g('S') || null, E: g('E') || null, n: +g('n') || 0, team: teamId };
   const err = validateCmd(cmd, teamId);
   return err ? { error: err } : { cmd };
 }
 
 function parseCommand(type, text, teamId) {
   const toks = String(text).replace(/[()（）\[\]]/g, ' ').split(/[,，\s]+/).filter(Boolean);
-  if (type === 'cultivate') {
-    if (toks.length < 2) return { error: `格式：${CMD_META.cultivate.fmt}` };
-    const E = resolveLoc(toks[0]), n = +toks[1];
-    if (!E) return { error: `找不到島「${toks[0]}」` };
-    const cmd = { type, S: E, E, n, team: teamId };  // 開墾來源即該島本身
-    const err = validateCmd(cmd, teamId);
-    return err ? { error: err } : { cmd };
-  }
   if (toks.length < 3) return { error: `格式：${CMD_META[type].fmt}` };
   const S = resolveLoc(toks[0]), E = resolveLoc(toks[1]), n = +toks[2];
   if (!S) return { error: `找不到出發地「${toks[0]}」` };
@@ -350,16 +348,14 @@ function parseCommand(type, text, teamId) {
 function validateCmd(c, teamId) {
   if (GAME.pending[teamId].length >= 3) return '每回合最多 3 個指令';
   if (!c.n || c.n % RULES.STEP) return '兵力須為 100 的倍數';
+  if (c.type === 'move') {
+    if (GAME.round > 1 && c.n > RULES.MOVE_MAX) return `移動每指令最多 ${RULES.MOVE_MAX} 兵（第一回合不限）`;
+    if (c.E !== 'B' && GAME.locations[c.E]?.owner !== teamId) return '只能移動到自己的島或兵營';
+  }
   if (c.type === 'attack') {
     if (c.n < RULES.MIN_ATTACK) return `進攻最低 ${RULES.MIN_ATTACK} 兵`;
     if (GAME.locations[c.E]?.owner === teamId) return '不能攻擊自己的島';
   }
-  if (c.type === 'cultivate') {
-    const loc = GAME.locations[c.E];
-    if (!loc || loc.owner !== teamId) return '只能開墾自己的島';
-    if (c.n > (loc.garrison[teamId] || 0)) return `開墾兵力不能超過該島駐軍（${loc.garrison[teamId] || 0}）`;
-  }
-  if (c.type === 'move' && c.E !== 'B' && GAME.locations[c.E]?.owner !== teamId) return '只能移動到自己的島或兵營';
   return null;
 }
 
@@ -376,21 +372,21 @@ function renderCmdList(box, teamId, onChange) {
 
 function cmdText(c) {
   const L = k => k === 'B' ? '兵營' : (GAME.locations[k]?.label || k);
-  if (c.type === 'cultivate') return `🌱 開墾 ${L(c.E)} ${c.n}`;
   if (c.type === 'move') return `🚶 移動 ${L(c.S)}→${L(c.E)} ${c.n}`;
   if (c.type === 'attack') return `⚔️ 攻擊 ${L(c.S)}→${L(c.E)} ${c.n}`;
+  if (c.type === 'train') return `🏋️ 訓練（兵營每滿${RULES.TRAIN_UNIT}+${RULES.TRAIN_GAIN}）`;
   return c.type;
 }
 
 function renderLog(log) {
   const box = el('div', 'log');
   const sec = (title, arr) => { if (!arr.length) return; box.appendChild(el('div', 'log-h', title)); arr.forEach(t => box.appendChild(el('div', 'log-line', t))); };
-  sec('🌱 開墾階段', log.cultivate);
   sec('🚶 移動階段', log.move);
   sec('⚔️ 攻擊階段', log.attack);
+  sec('🏋️ 訓練階段', log.train);
   sec(`${COCO} 資源發放`, log.resource);
   sec('📌 其他判定', log.notes);
-  if (!log.cultivate.length && !log.move.length && !log.attack.length && !log.notes.length)
+  if (!log.move.length && !log.attack.length && !log.train.length && !log.notes.length)
     box.appendChild(el('div', 'log-line', '本回合無任何操作。'));
   return box;
 }
@@ -410,15 +406,15 @@ export async function playSettlement(log, postState) {
   const feedBody = feed.querySelector('.feed-body');
 
   const phases = [
-    { key: 'cultivate', label: '🌱 開墾階段', color: '#3cb371' },
     { key: 'move', label: '🚶 移動階段', color: '#2a9df4' },
     { key: 'attack', label: '⚔️ 攻擊階段', color: '#ff6f61' },
+    { key: 'train', label: '🏋️ 訓練階段', color: '#3cb371' },
     { key: 'resource', label: `${COCO} 資源結算`, color: '#ffc23c' },
   ];
   const feedLines = {
-    cultivate: log.cultivate || [],
     move: log.move || [],
     attack: (log.attack || []).concat(notes),
+    train: log.train || [],
     resource: log.resource || [],
   };
 
@@ -431,7 +427,7 @@ export async function playSettlement(log, postState) {
     await showBanner(banner, ph.label, ph.color);
     appendFeed(feedBody, ph.label, lines, ph.color);
     await playPhase(overlay, ph.key, evs);
-    // 攻擊結束即更新島嶼歸屬（不等資源結算）；播放視窗用帶過來的結算後 state
+    // 攻擊結束即更新島嶼歸屬與兵營；播放視窗用帶過來的結算後 state
     if (ph.key === 'attack') {
       if (postState) loadState(postState);
       const board = document.getElementById('board');
@@ -466,6 +462,10 @@ async function playPhase(overlay, key, evs) {
     for (const e of evs) riseCoconut(overlay, e.at, e.coconut, e.harvest);
     await sleep(1900); return;
   }
+  if (key === 'train') {
+    for (const e of evs) riseTrain(overlay, e.at, e.gain);
+    await sleep(1700); return;
+  }
   if (key === 'attack') {
     const swords = evs.filter(e => e.kind === 'sword');
     const clashes = evs.filter(e => e.kind === 'clash');
@@ -474,7 +474,7 @@ async function playPhase(overlay, key, evs) {
     for (const c of clashes) burst(overlay, c.at);
     await sleep(1600); return;
   }
-  await travelTokens(overlay, evs, key === 'cultivate' ? 'seed' : 'person');
+  await travelTokens(overlay, evs, 'person');
 }
 
 async function travelTokens(overlay, evs, kind) {
@@ -486,7 +486,7 @@ function centerOf(id) { const n = document.getElementById(id); if (!n) return nu
 function moveToken(overlay, e, kind) {
   const from = centerOf(e.from), to = centerOf(e.to); if (!from || !to) return;
   const color = GAME.teams[e.team]?.color || '#fff';
-  const src = kind === 'seed' ? 'cultivate.png' : kind === 'sword' ? 'attack.png' : 'move.png';
+  const src = kind === 'sword' ? 'attack.png' : 'move.png';
   const tok = el('div', 'token'); tok.style.setProperty('--c', color);
   tok.innerHTML = `<img class="tok-icon" src="assets/img/${src}" alt=""><b>${e.n}</b>`;
   tok.style.left = from.x + 'px'; tok.style.top = from.y + 'px';
@@ -508,6 +508,14 @@ function riseCoconut(overlay, at, coconut, harvest) {
   r.style.left = c.x + 'px'; r.style.top = c.y + 'px';
   overlay.appendChild(r); void r.offsetWidth; r.classList.add('show');
   setTimeout(() => r.remove(), 1400);
+}
+function riseTrain(overlay, at, gain) {
+  const c = centerOf(at); if (!c) return;
+  const r = el('div', 'train-rise');
+  r.innerHTML = `🏋️ +${gain} 兵`;
+  r.style.left = c.x + 'px'; r.style.top = c.y + 'px';
+  overlay.appendChild(r); void r.offsetWidth; r.classList.add('show');
+  setTimeout(() => r.remove(), 1500);
 }
 
 // ---------------------------------------------------------

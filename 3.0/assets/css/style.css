@@ -352,3 +352,13 @@ input[type=number] { width: 96px; }
 
 .wait-img { width: 180px; height: auto; animation: bob 2s ease-in-out infinite;
   filter: drop-shadow(0 8px 10px rgba(0,0,0,.2)); }
+
+/* ========== 3.0：訓練增援上升動畫 ========== */
+.train-rise {
+  position: fixed; transform: translate(-50%, -50%); z-index: 1000;
+  font-family: "Baloo 2"; font-weight: 800; font-size: 18px; color: #1c8a4e;
+  background: #d6f5e2; padding: 3px 12px; border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(0,0,0,.2); opacity: 0; white-space: nowrap;
+  transition: transform 1.3s ease-out, opacity 1.3s;
+}
+.train-rise.show { transform: translate(-50%, -150%); opacity: 1; }
