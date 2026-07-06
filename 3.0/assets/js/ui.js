@@ -2,7 +2,7 @@
  * COCONUT WARS 3.0 — 介面渲染 + 結算動畫
  * ========================================================= */
 import { ISLANDS, IMG_BASE, RULES, DEFAULT_TEAMS, DEFAULT_ROUNDS } from './config.js';
-import { GAME, garrisonTotal, teamTotalTroops, isHarvest, isFinalRound, sourcesForTeam, ownIslands, islandYield, loadState } from './state.js';
+import { GAME, garrisonTotal, teamTotalTroops, isHarvest, isFinalRound, sourcesForTeam, ownIslands, islandYield, loadState, canRollback, saveGame, clearSavedGame } from './state.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -102,8 +102,11 @@ export function renderGame(root, opts = {}) {
     : `<span class="tag harvest">🌾 本回合豐收：${GAME.harvest.map(id => GAME.locations[id].label).join('、')}（×1.5）</span>`;
 
   const bar = el('div', 'topbar');
+  const rollbackBtn = (view === 'control' && canRollback())
+    ? '<button id="rollbackBtn" class="btn warn" title="捨棄本次結算、回到上一回合指令畫面（指令保留可改）">⏪ 退回上一回合</button>'
+    : '';
   const rightBtns = view === 'control'
-    ? `<button id="displayBtn" class="btn ghost">🖥️ 開啟播放視窗</button>
+    ? `${rollbackBtn}<button id="displayBtn" class="btn ghost">🖥️ 開啟播放視窗</button>
        <button id="settleBtn" class="btn primary">結算本回合 ▸</button>`
     : '<span class="tag open">播放視窗</span>';
   bar.innerHTML = `
@@ -125,7 +128,31 @@ export function renderGame(root, opts = {}) {
   if (view === 'control') {
     $('#settleBtn', bar).onclick = opts.onSettle;
     const db = $('#displayBtn', bar); if (db) db.onclick = opts.onOpenDisplay;
+    const rb = $('#rollbackBtn', bar); if (rb) rb.onclick = opts.onRollback;
   }
+}
+
+// 重新整理補救：偵測到存檔時的接續畫面
+export function renderResume(root, info, cbs) {
+  root.innerHTML = ''; root.className = '';
+  const wrap = el('div', 'setup');
+  wrap.appendChild(el('h1', 'title', `${COCO} COCONUT WARS 3.0`));
+  wrap.appendChild(el('p', 'subtitle', '訓練版 · 工作人員後台系統'));
+  const card = el('div', 'card');
+  card.innerHTML = `
+    <h2>🔄 偵測到未完成的遊戲</h2>
+    <p class="hint">進度：第 <b>${info.round}</b> / ${info.numRounds} 回合${info.done ? '（已結束）' : ''}。
+      重新整理／當掉都不會遺失，已輸入的指令與「退回上一回合」紀錄都會保留，可直接接續。</p>
+    <div class="resume-actions">
+      <button id="resumeBtn" class="btn primary big">▶️ 繼續遊戲</button>
+      <button id="newBtn" class="btn ghost">🆕 開新局（清除存檔）</button>
+    </div>`;
+  wrap.appendChild(card);
+  root.appendChild(wrap);
+  $('#resumeBtn', card).onclick = cbs.onResume;
+  $('#newBtn', card).onclick = () => {
+    if (window.confirm('確定要清除存檔、開新的一局嗎？此動作無法復原。')) cbs.onNew();
+  };
 }
 
 export function renderWaiting(root) {
@@ -277,7 +304,7 @@ function renderBuilder(box, teamId, onAdd) {
       const type = btn.dataset.tpl, m = CMD_META[type];
       const form = $('#cmdForm', box);
       form.classList.remove('hidden');
-      const push = res => { if (res.error) { flash(form, res.error); return; } GAME.pending[teamId].push(res.cmd); onAdd(); };
+      const push = res => { if (res.error) { flash(form, res.error); return; } GAME.pending[teamId].push(res.cmd); saveGame(); onAdd(); };
 
       if (type === 'train') {
         form.innerHTML = `
@@ -367,7 +394,7 @@ function renderCmdList(box, teamId, onChange) {
     item.innerHTML = `<span>${cmdText(c)}</span><button class="del" data-i="${i}">✕</button>`;
     box.appendChild(item);
   });
-  box.querySelectorAll('.del').forEach(b => { b.onclick = () => { GAME.pending[teamId].splice(+b.dataset.i, 1); onChange(); }; });
+  box.querySelectorAll('.del').forEach(b => { b.onclick = () => { GAME.pending[teamId].splice(+b.dataset.i, 1); saveGame(); onChange(); }; });
 }
 
 function cmdText(c) {
@@ -580,7 +607,7 @@ export function renderFinal(root) {
     podium.appendChild(row);
   });
   wrap.appendChild(podium);
-  const btn = el('button', 'btn primary big', '🔄 重新開始'); btn.onclick = () => location.reload();
+  const btn = el('button', 'btn primary big', '🔄 重新開始'); btn.onclick = () => { clearSavedGame(); location.reload(); };
   wrap.appendChild(btn); root.appendChild(wrap);
 }
 

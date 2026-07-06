@@ -13,6 +13,7 @@ export const GAME = {
   pending: {},      // teamId -> [command,...]
   harvest: [],      // 本回合豐收島 id
   log: [],
+  history: [],      // 結算前快照堆疊（緊急退回上一回合用）
 };
 
 export function initGame({ numTeams, numRounds, ownership, totals }) {
@@ -24,6 +25,7 @@ export function initGame({ numTeams, numRounds, ownership, totals }) {
   GAME.locations = {};
   GAME.pending = {};
   GAME.log = [];
+  GAME.history = [];
 
   for (let i = 0; i < numTeams; i++) {
     const c = TEAM_COLORS[i % TEAM_COLORS.length];
@@ -75,6 +77,50 @@ export function loadState(s) {
   GAME.phase = s.phase; GAME.teams = s.teams; GAME.locations = s.locations;
   GAME.harvest = s.harvest || []; GAME.log = s.log || []; GAME.pending = GAME.pending || {};
 }
+
+// --- 緊急退回上一回合 --------------------------------------------
+// 每次結算「前」拍一張快照（含當回合已輸入的指令）。退回時把整局狀態＋
+// 指令一併還原，回到該回合的指令輸入畫面，可修改後重新結算。history 不寫進
+// exportState（避免快照滾雪球），故只存在於主控端。
+export function snapshotBeforeSettle() {
+  GAME.history.push({
+    round: GAME.round,
+    state: exportState(),
+    pending: JSON.parse(JSON.stringify(GAME.pending)),
+  });
+}
+export function canRollback() { return GAME.history.length > 0; }
+export function prevRoundNo() {
+  const h = GAME.history;
+  return h.length ? h[h.length - 1].round : null;
+}
+export function rollbackHistory() {
+  if (!GAME.history.length) return false;
+  const snap = GAME.history.pop();
+  loadState(snap.state);
+  GAME.pending = JSON.parse(JSON.stringify(snap.pending));
+  return true;
+}
+
+// --- 自動存檔（重新整理補救）--------------------------------------
+// 把整局狀態（含 pending 指令與 history 退回堆疊）寫入 localStorage，
+// 讓主控端重新整理 / 當掉後可接續。僅主控端呼叫（播放端不寫，避免蓋掉）。
+const SAVE_KEY = 'coconut-wars-3-save';
+export function saveGame() {
+  try {
+    const data = { ...exportState(), pending: GAME.pending, history: GAME.history };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch (_) {}
+}
+export function loadSavedGame() {
+  try { const s = localStorage.getItem(SAVE_KEY); return s ? JSON.parse(s) : null; } catch (_) { return null; }
+}
+export function restoreGame(data) {
+  loadState(data);
+  GAME.pending = data.pending || {};
+  GAME.history = data.history || [];
+}
+export function clearSavedGame() { try { localStorage.removeItem(SAVE_KEY); } catch (_) {} }
 
 // --- 查詢輔助 ------------------------------------------------
 export function garrisonTotal(loc) { return Object.values(loc.garrison).reduce((a, b) => a + b, 0); }

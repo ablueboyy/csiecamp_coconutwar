@@ -95,7 +95,8 @@ export function settleRound() {
     const entries = Object.entries(sources);
     let remaining = back;
     entries.forEach(([k, amt], i) => {
-      const give = i === entries.length - 1 ? remaining : Math.min(remaining, Math.round(back * amt / committed));
+      // 依來源比例分配退兵，並對齊 100（back 恆為 100 倍數，最後一個來源拿餘數）
+      const give = i === entries.length - 1 ? remaining : Math.min(remaining, Math.round(back * amt / committed / RULES.STEP) * RULES.STEP);
       remaining -= give;
       retreatMap[team] = retreatMap[team] || {}; retreatMap[team][k] = (retreatMap[team][k] || 0) + give;
     });
