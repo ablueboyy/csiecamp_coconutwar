@@ -29,7 +29,7 @@ export function initGame({ numTeams, numRounds, ownership, totals, bonuses }) {
 
   for (let i = 0; i < numTeams; i++) {
     const c = TEAM_COLORS[i % TEAM_COLORS.length];
-    const bonus = (bonuses && bonuses[i]) ? RULES.BONUS_AMOUNT : 0;
+    const bonus = Math.max(0, (bonuses && bonuses[i]) || 0);
     GAME.teams[i] = { id: i, name: `${i} 小`, color: c.hex, colorName: c.name, barracks: 0, coconuts: 0, bonus };
     GAME.pending[i] = [];
   }

@@ -73,7 +73,9 @@ function renderAssign(card, numTeams, numRounds, onStart) {
   }
   let bonusRows = '';
   for (let i = 0; i < numTeams; i++) {
-    bonusRows += `<label class="bonus-item"><input type="checkbox" data-bonus="${i}"> ${i} 小 <b>+${RULES.BONUS_AMOUNT}</b></label>`;
+    const opts = RULES.BONUS_AMOUNTS.map(a =>
+      `<label class="bonus-opt"><input type="checkbox" data-bonus-team="${i}" data-amount="${a}"> +${a}</label>`).join('');
+    bonusRows += `<div class="bonus-item"><span class="bonus-team">${i} 小</span>${opts}</div>`;
   }
 
   card.innerHTML = `
@@ -82,8 +84,8 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     <h2>③ 各隊累積總兵力</h2>
     <p class="hint">總兵力<b>全數放入兵營</b>；每座己方島嶼<b>額外 +${RULES.INIT_ISLAND_TROOPS} 駐軍</b>（大小島皆同、不從總兵力扣）。</p>
     <div class="total-grid">${totalRows}</div>
-    <h2>④ 特殊小隊獎勵（+${RULES.BONUS_AMOUNT}）</h2>
-    <p class="hint">勾選的小隊各得 <b>+${RULES.BONUS_AMOUNT} 椰子</b>。此獎勵<b>全程隱藏</b>，直到最終排名按下「揭曉特殊獎勵」才加上。</p>
+    <h2>④ 特殊小隊獎勵</h2>
+    <p class="hint">可勾選 <b>+${RULES.BONUS_AMOUNTS.join(' / +')} 椰子</b>（同隊可同時勾選、累加）。此獎勵<b>全程隱藏</b>，直到最終排名按下「揭曉特殊獎勵」才加上。</p>
     <div class="bonus-grid">${bonusRows}</div>
     <button id="startBtn" class="btn primary big">🏝️ 開始遊戲</button>`;
 
@@ -93,7 +95,9 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     const totals = {};
     card.querySelectorAll('input[data-total]').forEach(inp => { totals[+inp.dataset.total] = +inp.value || 0; });
     const bonuses = {};
-    card.querySelectorAll('input[data-bonus]').forEach(cb => { bonuses[+cb.dataset.bonus] = cb.checked; });
+    card.querySelectorAll('input[data-bonus-team]').forEach(cb => {
+      if (cb.checked) { const t = +cb.dataset.bonusTeam; bonuses[t] = (bonuses[t] || 0) + (+cb.dataset.amount); }
+    });
     onStart({ numTeams, numRounds, ownership, totals, bonuses });
   };
 }
