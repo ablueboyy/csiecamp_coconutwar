@@ -427,3 +427,46 @@ input[type=number] { width: 96px; }
   0%,100% { filter: none; }
   30%,60% { filter: drop-shadow(0 0 14px #ffd24a) drop-shadow(0 0 8px #fff); transform: translate(-50%,-50%) scale(1.14); }
 }
+
+/* =========================================================
+ * 代碼收集（主控台）
+ * ========================================================= */
+.code-in-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.code-in { flex: 1; min-width: 0; font-size: 18px; letter-spacing: 1px; padding: 8px 10px;
+  border-radius: 10px; border: 2px solid var(--sea-light); font-family: "Baloo 2"; }
+.collect-grid { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+.collect-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: #fff8e6; }
+.collect-row.done { background: #d6f5e2; }
+.cr-team { font-weight: 800; min-width: 46px; }
+.cr-status { flex: 1; font-size: 13px; }
+.cr-clear { border: none; background: #ffe0d8; color: var(--coral-deep); border-radius: 8px; cursor: pointer; font-weight: 700; padding: 2px 8px; }
+.collect-sum { margin-top: 6px; font-weight: 800; text-align: right; color: var(--sea-deep); }
+
+/* =========================================================
+ * 小隊指令產生器（?view=team）
+ * ========================================================= */
+.code-team { max-width: 560px; }
+/* ① 選小隊 */
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
+.pick-btn { font-size: 20px; padding: 18px 0; background: linear-gradient(180deg, #fff, #fff2d6);
+  color: var(--sea-deep); box-shadow: 0 3px 0 var(--sand-deep); }
+.pick-btn:hover { filter: brightness(1.03); }
+/* ② 打指令 */
+.ct-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.ct-hint { font-size: 13px; color: #9a8a68; }
+.ct-tpls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.code-out { text-align: center; }
+.co-label { font-weight: 700; color: var(--sea-deep); margin-bottom: 6px; }
+.co-code { font-family: "Baloo 2"; font-weight: 800; font-size: 34px; letter-spacing: 3px; color: var(--coral-deep);
+  background: #fff8e6; border-radius: 12px; padding: 12px; word-break: break-all; margin-bottom: 12px; }
+.code-out .big { width: 100%; }
+
+/* 代碼驗證錯誤明細 */
+.code-errors:not(:empty) { background: #fff2ee; border: 2px solid #ffcabc; border-radius: 12px; padding: 8px 10px; margin: 8px 0; }
+.ce-title { font-weight: 800; color: var(--coral-deep); font-size: 13px; margin-bottom: 6px; line-height: 1.4; }
+.ce-row { display: flex; align-items: baseline; gap: 6px; font-size: 13px; padding: 3px 0; flex-wrap: wrap; }
+.ce-i { font-weight: 800; min-width: 42px; color: var(--sea-deep); }
+.ce-txt { flex: 0 0 auto; }
+.ce-ok { color: #1c8a4e; font-weight: 800; }
+.ce-why { color: var(--coral-deep); font-weight: 700; }
+.ce-row.bad .ce-txt { text-decoration: line-through; opacity: .7; }

@@ -3,6 +3,7 @@
  * ========================================================= */
 import { ISLANDS, IMG_BASE, RULES, DEFAULT_TEAMS, DEFAULT_ROUNDS } from './config.js';
 import { GAME, garrisonTotal, teamTotalTroops, isHarvest, isFinalRound, sourcesForTeam, ownIslands, islandYield, loadState, canRollback, saveGame, clearSavedGame } from './state.js';
+import { decodeCode } from './code.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -249,8 +250,38 @@ function renderSidebar(side, view = 'control') {
   side.appendChild(rank);
 
   if (view === 'control') {
+    // 代碼收集：小隊在 ?view=team 產生代碼 → 主持人貼上
+    const col = el('div', 'panel');
+    col.appendChild(el('h3', null, '📥 代碼收集'));
+    const row = el('div', 'code-in-row');
+    const input = el('input', 'code-in'); input.type = 'text'; input.inputMode = 'numeric'; input.placeholder = '貼上小隊代碼';
+    const addBtn = el('button', 'btn primary', '加入');
+    row.appendChild(input); row.appendChild(addBtn);
+    col.appendChild(row);
+    col.appendChild(el('div', 'flash'));
+    const errBox = el('div', 'code-errors'); col.appendChild(errBox);
+    const grid = el('div', 'collect-grid'); col.appendChild(grid);
+    side.appendChild(col);
+
+    const submitCode = () => {
+      errBox.innerHTML = '';
+      const res = decodeCode(input.value);
+      if (res.error) { flash(col, res.error); return; }
+      if (res.team < 0 || res.team >= GAME.numTeams) { flash(col, `隊號 ${res.team} 超出範圍`); return; }
+      const chk = validateSubmission(res.team, res.cmds);
+      if (!chk.valid) { renderCodeErrors(errBox, res.team, chk.rows); return; }   // 不合法 → 不收，請小隊修正重報
+      GAME.pending[res.team] = res.cmds.map(c => ({ ...c, team: res.team }));
+      _collected.add(res.team); saveGame(); input.value = '';
+      flash(col, `✅ 已收 ${res.team}小（${res.cmds.length} 指令）`);
+      renderCollectGrid(grid);
+    };
+    addBtn.onclick = submitCode;
+    input.onkeydown = e => { if (e.key === 'Enter') submitCode(); };
+    renderCollectGrid(grid);
+
+    // 手動輸入（無裝置的小隊備用）
     const cmd = el('div', 'panel');
-    cmd.appendChild(el('h3', null, '🎮 回合指令'));
+    cmd.appendChild(el('h3', null, '🎮 手動輸入（備用）'));
     const teamSel = el('select', 'team-select');
     for (let i = 0; i < GAME.numTeams; i++) {
       const o = el('option', null, `${i} 小　（兵營 ${GAME.teams[i].barracks}）`); o.value = i; teamSel.appendChild(o);
@@ -259,7 +290,11 @@ function renderSidebar(side, view = 'control') {
     const builder = el('div', 'builder'); cmd.appendChild(builder);
     const listBox = el('div', 'cmd-list'); cmd.appendChild(listBox);
     side.appendChild(cmd);
-    const refresh = () => { renderBuilder(builder, +teamSel.value, refresh); renderCmdList(listBox, +teamSel.value, refresh); };
+    const refresh = () => {
+      renderBuilder(builder, +teamSel.value, refresh);
+      renderCmdList(listBox, +teamSel.value, refresh);
+      renderCollectGrid(grid);   // 手動加/刪指令後同步更新收集狀態
+    };
     teamSel.onchange = refresh; refresh();
   }
 
@@ -658,6 +693,99 @@ function clamp(v, a, b) { return Math.max(a, Math.min(b, v || a)); }
 function flash(node, msg) {
   let f = node.querySelector('.flash');
   if (!f) { f = el('div', 'flash'); node.appendChild(f); }
-  f.textContent = '⚠️ ' + msg; f.classList.add('show');
+  f.textContent = (/^[✅📋🎁]/.test(msg) ? '' : '⚠️ ') + msg; f.classList.add('show');
   setTimeout(() => f.classList.remove('show'), 2600);
 }
+
+// =========================================================
+// 代碼收集（主控台）
+// =========================================================
+// 本回合已收到代碼的隊伍（放棄＝0 指令也算已收）；換回合自動清空
+let _collectRound = null;
+const _collected = new Set();
+function ensureCollectRound() { if (_collectRound !== GAME.round) { _collectRound = GAME.round; _collected.clear(); } }
+
+// 依目前盤面檢查一份提交是否合法；回傳每條指令的結果 + 整體 valid
+function availTroops(teamId, key) {
+  if (key === 'B') return GAME.teams[teamId].barracks;
+  return (GAME.locations[key] && GAME.locations[key].garrison[teamId]) || 0;
+}
+function locLabel(k) { return k === 'B' ? '兵營' : (GAME.locations[k] ? GAME.locations[k].label : k); }
+
+function validateSubmission(teamId, cmds) {
+  const rows = cmds.map(c => ({ c, ok: true, reason: '' }));
+  const fail = (r, reason) => { if (r.ok) { r.ok = false; r.reason = reason; } };
+
+  for (const r of rows) {
+    const c = r.c;
+    if (c.type === 'train') continue;
+    if (!c.n || c.n % RULES.STEP) fail(r, '兵力須為 100 的倍數');
+    if (c.S !== 'B' && GAME.locations[c.S] && GAME.locations[c.S].owner !== teamId) fail(r, `出發「${locLabel(c.S)}」非我方領地`);
+    if (c.type === 'move') {
+      if (GAME.round > 1 && c.n > RULES.MOVE_MAX) fail(r, `移動每指令最多 ${RULES.MOVE_MAX} 兵`);
+      if (c.E !== 'B' && GAME.locations[c.E] && GAME.locations[c.E].owner !== teamId) fail(r, `目的「${locLabel(c.E)}」非我方領地`);
+    }
+    if (c.type === 'attack') {
+      if (c.n < RULES.MIN_ATTACK) fail(r, `進攻最低 ${RULES.MIN_ATTACK} 兵`);
+      if (GAME.locations[c.E] && GAME.locations[c.E].owner === teamId) fail(r, `不能攻擊自己的「${locLabel(c.E)}」`);
+    }
+  }
+  // 訓練每回合最多一次
+  const trains = rows.filter(r => r.c.type === 'train');
+  trains.slice(1).forEach(r => fail(r, '訓練每回合最多一次'));
+
+  // 兵力超支：模擬引擎「移動階段 → 攻擊階段」順序
+  // （移動可把兵先送進某地，之後該地才用來攻擊，不算超支）
+  const avail = {};
+  const availOf = k => (k in avail) ? avail[k] : (avail[k] = availTroops(teamId, k));
+  const overdraftCheck = (rs, phase) => {
+    const bySrc = {};
+    for (const r of rs) (bySrc[r.c.S] = bySrc[r.c.S] || []).push(r);
+    for (const [src, list] of Object.entries(bySrc)) {
+      const sum = list.reduce((a, r) => a + r.c.n, 0);
+      const have = availOf(src);
+      if (sum > have) list.forEach(r => fail(r, `${phase}出發「${locLabel(src)}」兵力不足（需 ${sum}、現有 ${have}）`));
+    }
+  };
+  // ① 移動：對照初始兵力
+  const moveRows = rows.filter(r => r.ok && r.c.type === 'move');
+  overdraftCheck(moveRows, '移動');
+  // 套用通過的移動：扣出發地、加到目的地（供攻擊階段計算）
+  for (const r of moveRows) if (r.ok) { avail[r.c.S] = availOf(r.c.S) - r.c.n; avail[r.c.E] = availOf(r.c.E) + r.c.n; }
+  // ② 攻擊：對照移動後兵力
+  overdraftCheck(rows.filter(r => r.ok && r.c.type === 'attack'), '攻擊');
+
+  return { valid: rows.every(r => r.ok), rows };
+}
+
+function renderCodeErrors(box, team, rows) {
+  box.innerHTML = `<div class="ce-title">⚠️ ${team}小 代碼含不合法指令，未收下（請小隊修正後重報）：</div>`;
+  rows.forEach((r, i) => {
+    const line = el('div', 'ce-row ' + (r.ok ? 'ok' : 'bad'));
+    line.innerHTML = `<span class="ce-i">指令${i + 1}</span><span class="ce-txt">${cmdText(r.c)}</span>`
+      + (r.ok ? '<span class="ce-ok">✓</span>' : `<span class="ce-why">✗ ${r.reason}</span>`);
+    box.appendChild(line);
+  });
+}
+
+function renderCollectGrid(grid) {
+  ensureCollectRound();
+  grid.innerHTML = '';
+  let done = 0;
+  for (let i = 0; i < GAME.numTeams; i++) {
+    const list = GAME.pending[i] || [];
+    const has = _collected.has(i) || list.length > 0;
+    if (has) done++;
+    const rw = el('div', 'collect-row' + (has ? ' done' : ''));
+    rw.innerHTML = `<span class="cr-team"><span class="dot" style="background:${GAME.teams[i].color}"></span>${i}小</span>
+      <span class="cr-status">${has ? `✅ ${list.length} 指令` : '⏳ 未收'}</span>`;
+    if (has) {
+      const clr = el('button', 'cr-clear', '✕'); clr.title = '清除此隊';
+      clr.onclick = () => { GAME.pending[i] = []; _collected.delete(i); saveGame(); renderCollectGrid(grid); };
+      rw.appendChild(clr);
+    }
+    grid.appendChild(rw);
+  }
+  grid.appendChild(el('div', 'collect-sum', `已收 ${done} / ${GAME.numTeams} 隊`));
+}
+
