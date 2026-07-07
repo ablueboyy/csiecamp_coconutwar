@@ -77,11 +77,6 @@ input[type=number] { width: 96px; }
 .assign-item select { width: 100%; }
 .total-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .total-item { display: flex; flex-direction: column; font-size: 13px; }
-.bonus-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-.bonus-item { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 8px 12px;
-  background: var(--card); border-radius: 12px; box-shadow: var(--shadow); }
-.bonus-team { font-weight: 700; }
-.bonus-opt { display: inline-flex; align-items: center; gap: 4px; color: var(--coral-deep); font-weight: 700; cursor: pointer; }
 
 /* ---------- 遊戲主畫面 ---------- */
 .topbar {
