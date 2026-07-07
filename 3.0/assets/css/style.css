@@ -435,8 +435,12 @@ input[type=number] { width: 96px; }
 .code-in { flex: 1; min-width: 0; font-size: 18px; letter-spacing: 1px; padding: 8px 10px;
   border-radius: 10px; border: 2px solid var(--sea-light); font-family: "Baloo 2"; }
 .collect-grid { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
-.collect-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: #fff8e6; }
-.collect-row.done { background: #d6f5e2; }
+.collect-item { border-radius: 10px; background: #fff8e6; overflow: hidden; }
+.collect-item.done { background: #d6f5e2; }
+.collect-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
+.cr-cmds { padding: 0 8px 7px 30px; display: flex; flex-direction: column; gap: 2px; }
+.cr-cmd { font-size: 13px; color: var(--ink); }
+.cr-cmd.pass { color: #9a8a68; }
 .cr-team { font-weight: 800; min-width: 46px; }
 .cr-status { flex: 1; font-size: 13px; }
 .cr-clear { border: none; background: #ffe0d8; color: var(--coral-deep); border-radius: 8px; cursor: pointer; font-weight: 700; padding: 2px 8px; }

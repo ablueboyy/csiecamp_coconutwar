@@ -776,7 +776,8 @@ function renderCollectGrid(grid) {
     const list = GAME.pending[i] || [];
     const has = _collected.has(i) || list.length > 0;
     if (has) done++;
-    const rw = el('div', 'collect-row' + (has ? ' done' : ''));
+    const item = el('div', 'collect-item' + (has ? ' done' : ''));
+    const rw = el('div', 'collect-row');
     rw.innerHTML = `<span class="cr-team"><span class="dot" style="background:${GAME.teams[i].color}"></span>${i}小</span>
       <span class="cr-status">${has ? `✅ ${list.length} 指令` : '⏳ 未收'}</span>`;
     if (has) {
@@ -784,7 +785,15 @@ function renderCollectGrid(grid) {
       clr.onclick = () => { GAME.pending[i] = []; _collected.delete(i); saveGame(); renderCollectGrid(grid); };
       rw.appendChild(clr);
     }
-    grid.appendChild(rw);
+    item.appendChild(rw);
+    if (has) {
+      const det = el('div', 'cr-cmds');
+      det.innerHTML = list.length
+        ? list.map(c => `<div class="cr-cmd">${cmdText(c)}</div>`).join('')
+        : '<div class="cr-cmd pass">（放棄，無指令）</div>';
+      item.appendChild(det);
+    }
+    grid.appendChild(item);
   }
   grid.appendChild(el('div', 'collect-sum', `已收 ${done} / ${GAME.numTeams} 隊`));
 }
