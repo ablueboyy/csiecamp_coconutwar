@@ -122,7 +122,7 @@ input[type=number] { width: 96px; }
 .island > img { width: 100%; filter: drop-shadow(0 6px 6px rgba(0,0,0,.28)); user-select: none; }
 .island.locked > img { filter: grayscale(1) brightness(.45) drop-shadow(0 4px 4px rgba(0,0,0,.4)); }
 .isl-tag {
-  display: inline-block; font-family: "Baloo 2"; font-weight: 700; font-size: calc(var(--u,700px) * 0.018);
+  display: inline-block; font-family: "Baloo 2"; font-weight: 800; font-size: calc(var(--u,700px) * 0.024);
   background: #fff; color: var(--ink); padding: 1px 8px; border-radius: 999px;
   margin-top: calc(var(--u,700px) * -0.032); box-shadow: 0 2px 4px rgba(0,0,0,.2); border: 2px solid var(--owner);
 }
