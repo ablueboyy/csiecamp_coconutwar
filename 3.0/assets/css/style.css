@@ -128,7 +128,7 @@ input[type=number] { width: 96px; }
 }
 .isl-owner {
   display: inline-flex; align-items: center; gap: 3px; margin-top: 2px;
-  font-family: "Baloo 2"; font-weight: 700; font-size: calc(var(--u,700px) * 0.0166);
+  font-family: "Baloo 2"; font-weight: 800; font-size: calc(var(--u,700px) * 0.023);
   background: rgba(255,255,255,.92); color: var(--ink);
   padding: 1px 7px; border-radius: 999px; box-shadow: 0 2px 4px rgba(0,0,0,.25);
   border: 2px solid var(--owner); white-space: nowrap;
@@ -225,7 +225,7 @@ input[type=number] { width: 96px; }
   display: flex; flex-direction: column; line-height: 1.15; box-shadow: 0 3px 0 rgba(0,0,0,.1);
 }
 .hut-team { font-family: "Baloo 2"; font-weight: 800; font-size: 23px; color: var(--c); }
-.hut-troops { font-family: "Baloo 2"; font-weight: 700; font-size: 15px; color: var(--coral-deep); }
+.hut-troops { font-family: "Baloo 2"; font-weight: 800; font-size: 21px; color: var(--coral-deep); }
 
 /* ---------- 指令輸入（選 + 打 同時顯示）---------- */
 .mode-pick, .mode-type { background: #fff8e6; border: 2px solid var(--sand-deep); border-radius: 12px; padding: 8px 10px; margin-top: 8px; }
