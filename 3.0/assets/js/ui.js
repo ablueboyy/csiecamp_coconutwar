@@ -71,6 +71,10 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     totalRows += `<label class="total-item">${i} 小 總兵力
       <input type="number" data-total="${i}" min="0" step="100" value="3000"></label>`;
   }
+  let bonusRows = '';
+  for (let i = 0; i < numTeams; i++) {
+    bonusRows += `<label class="bonus-item"><input type="checkbox" data-bonus="${i}"> ${i} 小 <b>+${RULES.BONUS_AMOUNT}</b></label>`;
+  }
 
   card.innerHTML = `
     <h2>② 島嶼歸屬（大地遊戲結束時的佔領狀態）</h2>
@@ -78,6 +82,9 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     <h2>③ 各隊累積總兵力</h2>
     <p class="hint">總兵力<b>全數放入兵營</b>；每座己方島嶼<b>額外 +${RULES.INIT_ISLAND_TROOPS} 駐軍</b>（大小島皆同、不從總兵力扣）。</p>
     <div class="total-grid">${totalRows}</div>
+    <h2>④ 特殊小隊獎勵（+${RULES.BONUS_AMOUNT}）</h2>
+    <p class="hint">勾選的小隊各得 <b>+${RULES.BONUS_AMOUNT} 椰子</b>。此獎勵<b>全程隱藏</b>，直到最終排名按下「揭曉特殊獎勵」才加上。</p>
+    <div class="bonus-grid">${bonusRows}</div>
     <button id="startBtn" class="btn primary big">🏝️ 開始遊戲</button>`;
 
   $('#startBtn', card).onclick = () => {
@@ -85,7 +92,9 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     card.querySelectorAll('select[data-island]').forEach(s => { if (s.value !== '') ownership[s.dataset.island] = +s.value; });
     const totals = {};
     card.querySelectorAll('input[data-total]').forEach(inp => { totals[+inp.dataset.total] = +inp.value || 0; });
-    onStart({ numTeams, numRounds, ownership, totals });
+    const bonuses = {};
+    card.querySelectorAll('input[data-bonus]').forEach(cb => { bonuses[+cb.dataset.bonus] = cb.checked; });
+    onStart({ numTeams, numRounds, ownership, totals, bonuses });
   };
 }
 
@@ -592,24 +601,57 @@ function riseTrain(overlay, at, gain) {
 }
 
 // ---------------------------------------------------------
-export function renderFinal(root) {
+// 最終排名。特殊獎勵一開始隱藏（懸念），主持人按「揭曉」才加上並重新排序。
+// 揭曉動作由 revealFinalBonus() 執行，主控端按鈕與播放視窗同步都走這裡。
+let _revealFinal = null;
+
+function buildPodium(withBonus, animate) {
+  const score = tm => tm.coconuts + (withBonus ? (tm.bonus || 0) : 0);
+  const rows = Object.values(GAME.teams).slice().sort((a, b) => score(b) - score(a));
+  const podium = el('div', 'podium');
+  rows.forEach((tm, i) => {
+    const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+    const boosted = withBonus && (tm.bonus || 0) > 0;
+    const row = el('div', 'final-row' + (boosted ? ' boosted' : '') + (boosted && animate ? ' reveal-pulse' : ''));
+    row.style.borderColor = tm.color;
+    const bonusTag = boosted ? `<span class="fr-bonus">🎁 +${tm.bonus} 特殊獎勵</span>` : '';
+    row.innerHTML = `<span class="fr-medal">${medal}</span><span class="dot" style="background:${tm.color}"></span>
+      <span class="fr-name">${tm.id} 小</span>${bonusTag}<span class="fr-score">${COCO} ${score(tm)}</span>`;
+    podium.appendChild(row);
+  });
+  return podium;
+}
+
+export function renderFinal(root, opts = {}) {
   root.innerHTML = ''; root.className = '';
   const wrap = el('div', 'final');
   wrap.appendChild(el('h1', 'title', '🏁 最終排名'));
   wrap.appendChild(el('div', 'final-hero', '<img src="assets/img/bird-drink.png" alt="">'));
-  const rows = Object.values(GAME.teams).sort((a, b) => b.coconuts - a.coconuts);
-  const podium = el('div', 'podium');
-  rows.forEach((tm, i) => {
-    const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
-    const row = el('div', 'final-row'); row.style.borderColor = tm.color;
-    row.innerHTML = `<span class="fr-medal">${medal}</span><span class="dot" style="background:${tm.color}"></span>
-      <span class="fr-name">${tm.id} 小</span><span class="fr-score">${COCO} ${tm.coconuts}</span>`;
-    podium.appendChild(row);
-  });
+
+  const podium = buildPodium(false, false);
   wrap.appendChild(podium);
+
+  const hasBonus = Object.values(GAME.teams).some(t => (t.bonus || 0) > 0);
+  let revealBtn = null;
+  _revealFinal = () => {
+    _revealFinal = null;                       // 只揭曉一次
+    if (revealBtn) revealBtn.remove();
+    podium.replaceWith(buildPodium(true, true));
+  };
+
+  // 揭曉按鈕：只在主控端出現；按下後本地揭曉並廣播給播放視窗
+  if (hasBonus && opts.view !== 'display') {
+    revealBtn = el('button', 'btn reveal big', '🎁 揭曉特殊獎勵');
+    revealBtn.onclick = () => { const fn = _revealFinal; if (fn) fn(); if (opts.onReveal) opts.onReveal(); };
+    wrap.appendChild(revealBtn);
+  }
+
   const btn = el('button', 'btn primary big', '🔄 重新開始'); btn.onclick = () => { clearSavedGame(); location.reload(); };
   wrap.appendChild(btn); root.appendChild(wrap);
 }
+
+// 播放視窗收到主控端「揭曉」訊息時呼叫（主控端亦透過此函式本地揭曉）
+export function revealFinalBonus() { if (_revealFinal) _revealFinal(); }
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v || a)); }
 function flash(node, msg) {

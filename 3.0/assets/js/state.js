@@ -16,7 +16,7 @@ export const GAME = {
   history: [],      // 結算前快照堆疊（緊急退回上一回合用）
 };
 
-export function initGame({ numTeams, numRounds, ownership, totals }) {
+export function initGame({ numTeams, numRounds, ownership, totals, bonuses }) {
   GAME.numTeams = numTeams;
   GAME.numRounds = numRounds;
   GAME.round = 1;
@@ -29,7 +29,8 @@ export function initGame({ numTeams, numRounds, ownership, totals }) {
 
   for (let i = 0; i < numTeams; i++) {
     const c = TEAM_COLORS[i % TEAM_COLORS.length];
-    GAME.teams[i] = { id: i, name: `${i} 小`, color: c.hex, colorName: c.name, barracks: 0, coconuts: 0 };
+    const bonus = (bonuses && bonuses[i]) ? RULES.BONUS_AMOUNT : 0;
+    GAME.teams[i] = { id: i, name: `${i} 小`, color: c.hex, colorName: c.name, barracks: 0, coconuts: 0, bonus };
     GAME.pending[i] = [];
   }
 

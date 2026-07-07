@@ -5,7 +5,7 @@
 import { GAME, initGame, rollHarvest, exportState, loadState, snapshotBeforeSettle, canRollback, rollbackHistory, prevRoundNo,
   saveGame, loadSavedGame, restoreGame, clearSavedGame } from './state.js';
 import { settleRound } from './engine.js';
-import { renderSetup, renderGame, renderFinal, renderWaiting, renderResume, openSettlement, showSettlementBeat, closeSettlement } from './ui.js';
+import { renderSetup, renderGame, renderFinal, renderWaiting, renderResume, openSettlement, showSettlementBeat, closeSettlement, revealFinalBonus } from './ui.js';
 
 const root = document.getElementById('app');
 const VIEW = new URLSearchParams(location.search).get('view') || 'control';
@@ -13,6 +13,11 @@ const bus = new BroadcastChannel('coconut-wars-3');
 
 function enterControl() {
   renderGame(root, { view: 'control', onSettle: handleSettle, onOpenDisplay: openDisplay, onRollback: handleRollback });
+}
+
+// 主控端最終排名：按下「揭曉特殊獎勵」時本地揭曉並廣播給播放視窗
+function showFinalControl() {
+  renderFinal(root, { view: 'control', onReveal: () => bus.postMessage({ type: 'reveal' }) });
 }
 
 function handleSettle() {
@@ -30,7 +35,7 @@ function handleSettle() {
       if (GAME.round >= GAME.numRounds) {
         GAME.phase = 'done';
         saveGame();
-        renderFinal(root);
+        showFinalControl();
         bus.postMessage({ type: 'final', state: exportState() });
       } else {
         GAME.round += 1;
@@ -70,7 +75,7 @@ function startControl() {
       onResume: () => {
         restoreGame(saved);
         broadcastState();
-        if (saved.phase === 'done') renderFinal(root); else enterControl();
+        if (saved.phase === 'done') showFinalControl(); else enterControl();
       },
       onNew: () => { clearSavedGame(); startSetup(); },
     });
@@ -90,7 +95,8 @@ bus.onmessage = (e) => {
   if (m.type === 'state') { closeSettlement(); loadState(m.state); renderGame(root, { view: 'display' }); }
   else if (m.type === 'settle') { openSettlement(m.log, m.state, false, {}); }
   else if (m.type === 'beat') { showSettlementBeat(m.i); }
-  else if (m.type === 'final') { closeSettlement(); loadState(m.state); renderFinal(root); }
+  else if (m.type === 'final') { closeSettlement(); loadState(m.state); renderFinal(root, { view: 'display' }); }
+  else if (m.type === 'reveal') { revealFinalBonus(); }
 };
 
 if (VIEW === 'display') startDisplay(); else startControl();

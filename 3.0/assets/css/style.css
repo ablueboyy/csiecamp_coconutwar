@@ -77,6 +77,10 @@ input[type=number] { width: 96px; }
 .assign-item select { width: 100%; }
 .total-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .total-item { display: flex; flex-direction: column; font-size: 13px; }
+.bonus-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.bonus-item { display: flex; align-items: center; gap: 6px; font-size: 14px; padding: 8px 10px;
+  background: var(--card); border-radius: 12px; box-shadow: var(--shadow); cursor: pointer; }
+.bonus-item b { color: var(--coral-deep); }
 
 /* ---------- 遊戲主畫面 ---------- */
 .topbar {
@@ -188,6 +192,16 @@ input[type=number] { width: 96px; }
 .fr-medal { font-size: 24px; width: 34px; }
 .fr-name { font-weight: 700; }
 .fr-score { margin-left: auto; font-family: "Baloo 2"; font-weight: 800; color: var(--coral-deep); }
+.fr-bonus { font-size: 13px; font-weight: 800; color: #b5651d;
+  background: linear-gradient(180deg, #fff2c9, #ffe08a); border-radius: 999px; padding: 3px 10px; }
+.final-row.boosted { border-color: #ffb020; box-shadow: 0 0 0 2px #ffd98a, var(--shadow); }
+.reveal-pulse { animation: bonus-pop .6s ease-out; }
+@keyframes bonus-pop {
+  0% { transform: scale(.94); box-shadow: 0 0 0 0 rgba(255,176,32,.6), var(--shadow); }
+  50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(255,176,32,0), var(--shadow); }
+  100% { transform: scale(1); box-shadow: 0 0 0 2px #ffd98a, var(--shadow); }
+}
+.btn.reveal { background: linear-gradient(180deg, #ffd98a, #ffb020); color: #6b4a00; box-shadow: 0 4px 0 #cc8a00; }
 .final .btn { display: block; margin: 24px auto 0; }
 
 /* ---------- 地圖下方沙灘 + 兵營帳篷 ---------- */
