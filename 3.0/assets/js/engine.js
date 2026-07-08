@@ -9,7 +9,7 @@ import { GAME, garrisonTotal, isHarvest } from './state.js';
 
 const COCO = '<img class="coco-ic" src="assets/img/coconut.png" alt="椰子">';
 
-// 指令：{ type:'move'|'attack'|'train', S, E, n, team }
+// 指令：{ type:'move'|'attack', S, E, n, team }（訓練已改為自動、非指令）
 
 export function settleRound() {
   const log = { round: GAME.round, move: [], attack: [], train: [], resource: [], notes: [], events: [], battles: [], recap: [] };
@@ -141,17 +141,16 @@ export function settleRound() {
     }
   }
 
-  // ---------- ③ 訓練階段（每隊最多一次）----------
-  const trainTeams = [...new Set(byType('train').map(c => c.team))];
-  for (const team of trainTeams) {
+  // ---------- ③ 自動訓練（每回合，全隊皆同）----------
+  // 兵營每滿 TRAIN_UNIT → +TRAIN_GAIN，無需下指令，自動生效。
+  for (const tid of Object.keys(GAME.teams)) {
+    const team = Number(tid);
     const before = Math.max(0, Math.round(barracks[team] || 0));
     const gain = Math.floor(before / RULES.TRAIN_UNIT) * RULES.TRAIN_GAIN;
     if (gain > 0) {
       barracks[team] += gain;
-      log.train.push(`🏋️ ${team}小 訓練：兵營 ${before} → +${gain}（每滿 ${RULES.TRAIN_UNIT} +${RULES.TRAIN_GAIN}）`);
+      log.train.push(`🏋️ ${team}小 自動訓練：兵營 ${before} → +${gain}（每滿 ${RULES.TRAIN_UNIT} +${RULES.TRAIN_GAIN}）`);
       log.events.push({ phase: 'train', kind: 'train', at: elBrk(team), team, gain });
-    } else {
-      log.train.push(`🏋️ ${team}小 訓練：兵營 ${before} 不足 ${RULES.TRAIN_UNIT}，無增援`);
     }
   }
 
@@ -160,8 +159,17 @@ export function settleRound() {
   for (const [id, g] of Object.entries(garrison)) {
     const clean = {};
     for (const [t, n] of Object.entries(g)) if (Math.round(n) > 0) clean[t] = Math.round(n);
-    GAME.locations[id].garrison = clean;
-    GAME.locations[id].owner = Object.keys(clean).length ? Number(Object.keys(clean)[0]) : null;
+    let owner = Object.keys(clean).length ? Number(Object.keys(clean)[0]) : null;
+    // 守軍不足 MIN_GARRISON → 強制中立（棄守，兵力消失、島變空島）
+    const total = Object.values(clean).reduce((a, n) => a + n, 0);
+    if (owner != null && total < RULES.MIN_GARRISON) {
+      log.notes.push(`⚠️ ${GAME.locations[id].label} 守軍 ${total} 不足 ${RULES.MIN_GARRISON}，強制中立（棄守）`);
+      GAME.locations[id].garrison = {};
+      GAME.locations[id].owner = null;
+    } else {
+      GAME.locations[id].garrison = clean;
+      GAME.locations[id].owner = owner;
+    }
   }
 
   // ---------- 資源發放（含豐收 ×1.5）----------

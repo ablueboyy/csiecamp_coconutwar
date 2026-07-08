@@ -5,8 +5,8 @@
  * 因此不需要另存「指令數」，編號本身就隱含長度，長度即資訊理論最短。
  *
  * 單一指令的可能數 C：
- *   訓練 1 種 ＋ 移動/攻擊各 N×N×H 種（N=位置數15、H=兵力百數1..99）
- *   C = 1 + 2·N·N·H = 44551
+ *   移動/攻擊各 N×N×H 種（N=位置數、H=兵力百數1..99），訓練已改為自動、非指令。
+ *   C = 2·N·N·H
  * 指令串（長度 0..3）用混合基數雙射：
  *   enc([])            = 0
  *   enc(c :: 其餘)     = 1 + c + C · enc(其餘)
@@ -17,10 +17,10 @@
 import { ISLANDS } from './config.js';
 
 const LOCS = ['B', ...ISLANDS.map(i => i.id)];   // 0=兵營，其餘為島 id
-const N = LOCS.length;      // 15
+const N = LOCS.length;      // 位置數（兵營 + 島嶼）
 const H = 99;               // 兵力百數 1..99（100~9900）
-const MOVE = N * N * H;     // 移動（或攻擊）各自的種數 = 22275
-const C = 1 + 2 * MOVE;     // 單一指令總種數 = 44551
+const MOVE = N * N * H;     // 移動（或攻擊）各自的種數
+const C = 2 * MOVE;         // 單一指令總種數（移動 + 攻擊）
 const MAX3 = (() => { let c = 1; for (let k = 0; k < 3; k++) c = 1 + C * c; return c; })();   // 長度≤3 的總數
 
 const locIdx = id => { const i = LOCS.indexOf(id); return i < 0 ? 0 : i; };
@@ -29,16 +29,13 @@ const checksum = str => str.split('').reduce((a, d) => a + (+d || 0), 0) % 10;
 
 // 單一指令 ↔ [0,C) -----------------------------------------
 function encCmd(c) {
-  if (c.type === 'train') return 0;
   const h = Math.min(H, Math.max(1, Math.round((c.n || 0) / 100)));
   const m = (locIdx(c.S) * N + locIdx(c.E)) * H + (h - 1);
-  return 1 + (c.type === 'attack' ? MOVE : 0) + m;
+  return (c.type === 'attack' ? MOVE : 0) + m;
 }
 function decCmd(v, team) {
-  if (v === 0) return { type: 'train', S: null, E: null, n: 0, team };
-  const v1 = v - 1;
-  const attack = v1 >= MOVE;
-  const m = attack ? v1 - MOVE : v1;
+  const attack = v >= MOVE;
+  const m = attack ? v - MOVE : v;
   const h = (m % H) + 1;
   const e = Math.floor(m / H) % N;
   const s = Math.floor(m / H / N);

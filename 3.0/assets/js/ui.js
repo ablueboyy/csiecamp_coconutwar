@@ -37,7 +37,7 @@ export function renderSetup(root, onStart) {
       <label>小隊數量 <input id="numTeams" type="number" min="2" max="10" value="${DEFAULT_TEAMS}"></label>
       <label>回合數量 <input id="numRounds" type="number" min="1" max="8" value="${DEFAULT_ROUNDS}"></label>
     </div>
-    <p class="hint">小隊編號為 0 ~ 小隊數-1。指令：移動 / 攻擊 / 訓練。每回合 2 島豐收 ×1.5，最後一回合全島大豐收。</p>
+    <p class="hint">小隊編號為 0 ~ 小隊數-1。指令：移動 / 攻擊（訓練每回合自動）。每回合 2 島豐收 ×1.5，最後一回合全島大豐收。</p>
     <button id="genBtn" class="btn primary">產生島嶼分配表 ▸</button>`;
   wrap.appendChild(card);
 
@@ -82,7 +82,7 @@ function renderAssign(card, numTeams, numRounds, onStart) {
     <h2>② 島嶼歸屬（大地遊戲結束時的佔領狀態）</h2>
     <div class="assign-grid">${islandRows}</div>
     <h2>③ 各隊累積總兵力</h2>
-    <p class="hint">總兵力<b>全數放入兵營</b>；每座己方島嶼<b>額外 +${RULES.INIT_ISLAND_TROOPS} 駐軍</b>（大小島皆同、不從總兵力扣）。</p>
+    <p class="hint">總兵力<b>全數放入兵營</b>；每座己方島嶼<b>額外 +${RULES.INIT_ISLAND_TROOPS} 駐軍</b>（大小島皆同、不從總兵力扣）。訓練每回合自動（兵營每滿 ${RULES.TRAIN_UNIT} +${RULES.TRAIN_GAIN}）；島上守軍不足 ${RULES.MIN_GARRISON} 會強制中立。</p>
     <div class="total-grid">${totalRows}</div>
     <h2>④ 特殊小隊獎勵</h2>
     <p class="hint">可自行輸入各隊<b>額外椰子數</b>（0 表示沒有）。此獎勵<b>全程隱藏</b>，直到最終排名按下「揭曉特殊獎勵」才加上。</p>
@@ -321,9 +321,8 @@ function rankTable() {
 
 // --- 指令建構器 -----------------------------------------
 const CMD_META = {
-  move:   { fmt: `出發, 目的(己方), 兵力（首回合不限，之後≤${RULES.MOVE_MAX}）`, ex: `兵營, 河童國, ${RULES.MOVE_MAX}` },
-  attack: { fmt: '出發, 目標, 兵力', ex: '兵營, 傀儡族, 300' },
-  train:  { fmt: '（無參數）', ex: '' },
+  move:   { fmt: `出發, 目的(己方), 兵力（首回合不限，之後≤${RULES.MOVE_MAX}）`, ex: `兵營, 巨人山丘, ${RULES.MOVE_MAX}` },
+  attack: { fmt: '出發, 目標, 兵力', ex: '兵營, 黃金洞窟, 300' },
 };
 
 function renderBuilder(box, teamId, onAdd) {
@@ -332,15 +331,14 @@ function renderBuilder(box, teamId, onAdd) {
     <div class="templates">
       <button data-tpl="move" class="btn tpl"><img class="tpl-ic" src="assets/img/move.png" alt="">移動</button>
       <button data-tpl="attack" class="btn tpl"><img class="tpl-ic" src="assets/img/attack.png" alt="">攻擊</button>
-      <button data-tpl="train" class="btn tpl"><img class="tpl-ic" src="assets/img/bird-run.png" alt="">訓練</button>
     </div>
     <div id="cmdForm" class="cmd-form hidden"></div>
     <details class="ref"><summary>📖 可用名稱參考</summary>
       <div class="ref-body">
         <b>出發地(此隊)：</b>${srcList}<br>
-        <b>島嶼：</b>見地圖島名（六大島／八小島）　<b>兵營：</b>輸入「兵營」或「B」<br>
+        <b>島嶼：</b>見地圖島名（8 小島 ＋ 中立黃金洞窟）　<b>兵營：</b>輸入「兵營」或「B」<br>
         <b>移動：</b>第一回合不限；之後每指令最多 ${RULES.MOVE_MAX} 兵　<b>攻擊：</b>無門檻、100 倍數<br>
-        <b>訓練：</b>兵營每滿 ${RULES.TRAIN_UNIT} 兵 +${RULES.TRAIN_GAIN}（每回合最多一次）
+        <b>訓練：</b>每回合自動（兵營每滿 ${RULES.TRAIN_UNIT} 兵 +${RULES.TRAIN_GAIN}）　<b>守軍：</b>己島不足 ${RULES.MIN_GARRISON} 會強制中立
       </div>
     </details>`;
 
@@ -350,18 +348,6 @@ function renderBuilder(box, teamId, onAdd) {
       const form = $('#cmdForm', box);
       form.classList.remove('hidden');
       const push = res => { if (res.error) { flash(form, res.error); return; } GAME.pending[teamId].push(res.cmd); saveGame(); onAdd(); };
-
-      if (type === 'train') {
-        form.innerHTML = `
-          <div class="form-title"><b>訓練</b>：兵營每滿 ${RULES.TRAIN_UNIT} 兵 +${RULES.TRAIN_GAIN}（每回合最多一次）</div>
-          <button class="btn primary add-train">＋ 加入訓練指令</button><div class="flash"></div>`;
-        $('.add-train', form).onclick = () => {
-          if (GAME.pending[teamId].length >= 3) { flash(form, '每回合最多 3 個指令'); return; }
-          if (GAME.pending[teamId].some(c => c.type === 'train')) { flash(form, '訓練每回合最多一次'); return; }
-          push({ cmd: { type: 'train', S: null, E: null, n: 0, team: teamId } });
-        };
-        return;
-      }
 
       form.innerHTML = `
         <div class="form-title"><b>${type === 'move' ? '移動' : '攻擊'}</b>　格式：<code>${m.fmt}</code></div>
@@ -446,7 +432,6 @@ function cmdText(c) {
   const L = k => k === 'B' ? '兵營' : (GAME.locations[k]?.label || k);
   if (c.type === 'move') return `🚶 移動 ${L(c.S)}→${L(c.E)} ${c.n}`;
   if (c.type === 'attack') return `⚔️ 攻擊 ${L(c.S)}→${L(c.E)} ${c.n}`;
-  if (c.type === 'train') return `🏋️ 訓練（兵營每滿${RULES.TRAIN_UNIT}+${RULES.TRAIN_GAIN}）`;
   return c.type;
 }
 
@@ -455,7 +440,7 @@ function renderLog(log) {
   const sec = (title, arr) => { if (!arr.length) return; box.appendChild(el('div', 'log-h', title)); arr.forEach(t => box.appendChild(el('div', 'log-line', t))); };
   sec('🚶 移動階段', log.move);
   sec('⚔️ 攻擊階段', log.attack);
-  sec('🏋️ 訓練階段', log.train);
+  sec('🏋️ 自動訓練', log.train);
   sec(`${COCO} 資源發放`, log.resource);
   sec('📌 其他判定', log.notes);
   if (!log.move.length && !log.attack.length && !log.train.length && !log.notes.length)
@@ -491,7 +476,7 @@ function buildBeats(log) {
     });
   }
 
-  if ((log.train || []).length) beats.push({ type: 'train', title: '🏋️ 訓練階段', lines: log.train, trainEvents: (log.events || []).filter(e => e.phase === 'train'), color: '#3cb371' });
+  if ((log.train || []).length) beats.push({ type: 'train', title: '🏋️ 自動訓練', lines: log.train, trainEvents: (log.events || []).filter(e => e.phase === 'train'), color: '#3cb371' });
   if ((log.resource || []).length) beats.push({ type: 'resource', title: `${COCO} 資源結算`, lines: log.resource, coconutEvents: (log.events || []).filter(e => e.phase === 'resource'), color: '#ffc23c' });
   beats.push({ type: 'recap', title: '📊 本回合回顧', recap: log.recap || [], color: '#0b6e99' });
 
@@ -718,7 +703,6 @@ function validateSubmission(teamId, cmds) {
 
   for (const r of rows) {
     const c = r.c;
-    if (c.type === 'train') continue;
     if (!c.n || c.n % RULES.STEP) fail(r, '兵力須為 100 的倍數');
     if (c.S !== 'B' && GAME.locations[c.S] && GAME.locations[c.S].owner !== teamId) fail(r, `出發「${locLabel(c.S)}」非我方領地`);
     if (c.type === 'move') {
@@ -730,10 +714,6 @@ function validateSubmission(teamId, cmds) {
       if (GAME.locations[c.E] && GAME.locations[c.E].owner === teamId) fail(r, `不能攻擊自己的「${locLabel(c.E)}」`);
     }
   }
-  // 訓練每回合最多一次
-  const trains = rows.filter(r => r.c.type === 'train');
-  trains.slice(1).forEach(r => fail(r, '訓練每回合最多一次'));
-
   // 兵力超支：模擬引擎「移動階段 → 攻擊階段」順序
   // （移動可把兵先送進某地，之後該地才用來攻擊，不算超支）
   const avail = {};

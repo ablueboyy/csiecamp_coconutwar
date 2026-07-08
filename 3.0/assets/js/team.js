@@ -3,7 +3,7 @@
  * ---------------------------------------------------------
  * 流程：① 選小隊 → ② 打指令 → 產生純數字代碼報給主持人。
  * 與主遊戲完全分離：只依賴 config（島嶼清單）與 code（編碼）。
- * 限制：每回合最多 3 個指令、訓練每回合最多一次（在此直接把關）。
+ * 限制：每回合最多 3 個指令（訓練已改為每回合自動、非指令）。
  * ========================================================= */
 import { ISLANDS } from './config.js';
 import { encodeCode } from './code.js';
@@ -18,7 +18,6 @@ function cmdText(c) {
   const L = k => LABELS[k] || k;
   if (c.type === 'move') return `🚶 移動 ${L(c.S)}→${L(c.E)} ${c.n}`;
   if (c.type === 'attack') return `⚔️ 攻擊 ${L(c.S)}→${L(c.E)} ${c.n}`;
-  if (c.type === 'train') return '🏋️ 訓練';
   return c.type;
 }
 function flash(node, msg) {
@@ -63,13 +62,12 @@ function renderCommand(root, teamId) {
   const card = el('div', 'card');
   card.innerHTML = `
     <div class="ct-head">
-      <span class="ct-hint">每回合最多 ${MAX_CMDS} 個指令，訓練最多一次</span>
+      <span class="ct-hint">每回合最多 ${MAX_CMDS} 個指令（訓練自動）</span>
       <button class="btn ghost ct-back">↩ 換隊</button>
     </div>
     <div class="ct-tpls">
       <button class="btn tpl" data-t="move">🚶 移動</button>
       <button class="btn tpl" data-t="attack">⚔️ 攻擊</button>
-      <button class="btn tpl" data-t="train">🏋️ 訓練</button>
     </div>
     <div id="ctForm" class="cmd-form"></div>
     <div id="ctList" class="cmd-list"></div>
@@ -92,11 +90,10 @@ function renderCommand(root, teamId) {
   const listBox = $('#ctList', card);
   const codeEl = $('#ctCode', codeCard);
   const tpls = card.querySelectorAll('.tpl');
-  const trainUsed = () => cmds.some(c => c.type === 'train');
 
   const updateTpls = () => {
     const full = cmds.length >= MAX_CMDS;
-    tpls.forEach(b => { b.disabled = full || (b.dataset.t === 'train' && trainUsed()); });
+    tpls.forEach(b => { b.disabled = full; });
   };
   const refreshCode = () => { codeEl.textContent = encodeCode(teamId, cmds); };
   const refreshList = () => {
@@ -111,14 +108,12 @@ function renderCommand(root, teamId) {
   };
   const addCmd = c => {
     if (cmds.length >= MAX_CMDS) { flash(card, `每回合最多 ${MAX_CMDS} 個指令`); return; }
-    if (c.type === 'train' && trainUsed()) { flash(card, '訓練每回合最多一次'); return; }
     cmds.push(c); form.innerHTML = ''; refreshList();
   };
 
   tpls.forEach(btn => btn.onclick = () => {
     if (btn.disabled) return;
     const t = btn.dataset.t;
-    if (t === 'train') { addCmd({ type: 'train', S: null, E: null, n: 0, team: teamId }); return; }
     const targetOpts = t === 'move' ? srcOpts : islOpts;
     const dv = t === 'move' ? 500 : 300;
     form.innerHTML = `
