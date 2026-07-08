@@ -28,18 +28,18 @@ export const RULES = {
 // 中央的黃金洞窟（大島）為初始中立寶島：開局無守軍（空島），先搶先得、可被攻佔。
 // 四周 8 座小島為各隊可佔領領地（含原軍火要塞，現為一般小島）。
 export const ISLANDS = [
-  // 第1排（y=20）
-  { id: 'small1', label: '巨人山丘', type: 'small', img: '巨人山丘.PNG', x: 25, y: 20 },
-  { id: 'small2', label: '狐族賭館', type: 'small', img: '狐族賭館.PNG', x: 50, y: 20 },
-  { id: 'small3', label: '機械王國', type: 'small', img: '機械王國.PNG', x: 75, y: 20 },
-  // 第2排（y=48）
+  // 第1排（y=20）— 稍微左移
+  { id: 'small1', label: '巨人山丘', type: 'small', img: '巨人山丘.PNG', x: 20, y: 20 },
+  { id: 'small2', label: '狐族賭館', type: 'small', img: '狐族賭館.PNG', x: 45, y: 20 },
+  { id: 'small3', label: '機械王國', type: 'small', img: '機械王國.PNG', x: 70, y: 20 },
+  // 第2排（y=48）— 置中（黃金洞窟居中）
   { id: 'small4', label: '布丁狗族', type: 'small', img: '布丁狗族.PNG', x: 25, y: 48 },
   { id: 'big6',   label: '黃金洞窟', type: 'big',   img: '黃金洞窟.PNG', x: 50, y: 48 },
   { id: 'small5', label: '哥布林族', type: 'small', img: '哥布林族.PNG', x: 75, y: 48 },
-  // 第3排（y=76）
-  { id: 'small6', label: '龍族火山', type: 'small', img: '龍族火山.PNG', x: 25, y: 76 },
-  { id: 'small7', label: '精靈森域', type: 'small', img: '精靈森域.PNG', x: 50, y: 76 },
-  { id: 'small8', label: '軍火要塞', type: 'small', img: '軍火要塞.PNG', x: 75, y: 76 },
+  // 第3排（y=76）— 稍微右移
+  { id: 'small6', label: '龍族火山', type: 'small', img: '龍族火山.PNG', x: 30, y: 76 },
+  { id: 'small7', label: '精靈森域', type: 'small', img: '精靈森域.PNG', x: 55, y: 76 },
+  { id: 'small8', label: '軍火要塞', type: 'small', img: '軍火要塞.PNG', x: 80, y: 76 },
 ];
 
 export const IMG_BASE = 'island/';
