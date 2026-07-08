@@ -298,12 +298,112 @@ function renderSidebar(side, view = 'control') {
     teamSel.onchange = refresh; refresh();
   }
 
-  if (GAME.log && GAME.log.round) {
-    const logp = el('div', 'panel');
-    logp.appendChild(el('h3', null, `📜 第 ${GAME.log.round} 回合結算`));
-    logp.appendChild(renderLog(GAME.log));
-    side.appendChild(logp);
+  renderTimerPanel(side, view);
+}
+
+// =========================================================
+// ⏱️ 計時器（主控台控制、投影同步）
+// =========================================================
+// TIMER 為模組層狀態，跨畫面重繪也會延續。running 時以 endTime 推算剩餘，
+// 暫停時保存 remainingMs。主控台變更後透過 _timerBroadcast 廣播給投影視窗。
+let TIMER = { running: false, endTime: 0, remainingMs: 5 * 60 * 1000 };
+let _timerBroadcast = null;   // 僅主控台綁定；投影端為 null（不廣播）
+let _timerLoop = null;
+
+export function bindTimerBroadcast(fn) { _timerBroadcast = fn; }
+export function getTimerState() { return { ...TIMER }; }
+// 投影端收到主控台廣播時套用
+export function applyTimerState(t) {
+  if (!t) return;
+  TIMER = { running: !!t.running, endTime: t.endTime || 0, remainingMs: Math.max(0, t.remainingMs || 0) };
+  ensureTimerLoop();
+  paintTimer();
+}
+
+function timerRemainingMs() {
+  return TIMER.running ? Math.max(0, TIMER.endTime - Date.now()) : Math.max(0, TIMER.remainingMs);
+}
+function fmtClock(ms) {
+  const s = Math.ceil(Math.max(0, ms) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+function broadcastTimer() { if (_timerBroadcast) _timerBroadcast({ ...TIMER }); }
+
+function ensureTimerLoop() {
+  if (_timerLoop) return;
+  _timerLoop = setInterval(() => {
+    if (TIMER.running && timerRemainingMs() <= 0) {   // 倒數結束
+      TIMER.running = false; TIMER.remainingMs = 0;
+      if (_timerBroadcast) broadcastTimer();          // 主控台把「停在 0」同步出去
+    }
+    paintTimer();
+  }, 200);
+}
+
+// 更新畫面上所有計時器數字（若當前 DOM 有的話）
+function paintTimer() {
+  const ms = timerRemainingMs();
+  document.querySelectorAll('.timer-clock').forEach(c => {
+    c.textContent = fmtClock(ms);
+    c.classList.toggle('ending', ms > 0 && ms <= 10000);
+    c.classList.toggle('zero', ms <= 0);
+  });
+}
+
+function renderTimerPanel(side, view) {
+  const p = el('div', 'panel timer-panel');
+  p.appendChild(el('h3', null, '⏱️ 計時器'));
+  const clock = el('div', 'timer-clock'); clock.textContent = fmtClock(timerRemainingMs());
+  p.appendChild(clock);
+
+  if (view === 'control') {
+    const ctrls = el('div', 'timer-ctrls');
+    ctrls.innerHTML = `
+      <div class="timer-set">
+        <label>分 <input class="tm-min" type="number" min="0" max="99" value="5"></label>
+        <label>秒 <input class="tm-sec" type="number" min="0" max="59" step="5" value="0"></label>
+        <button class="btn ghost tm-set">設定</button>
+      </div>
+      <div class="timer-presets">
+        <button class="btn tpl tm-preset" data-sec="60">1 分</button>
+        <button class="btn tpl tm-preset" data-sec="180">3 分</button>
+        <button class="btn tpl tm-preset" data-sec="300">5 分</button>
+        <button class="btn tpl tm-preset" data-sec="600">10 分</button>
+      </div>
+      <div class="timer-btns">
+        <button class="btn primary tm-toggle">▶ 開始</button>
+        <button class="btn ghost tm-reset">⟲ 重設</button>
+      </div>`;
+    p.appendChild(ctrls);
+
+    const minEl = ctrls.querySelector('.tm-min');
+    const secEl = ctrls.querySelector('.tm-sec');
+    const toggleBtn = ctrls.querySelector('.tm-toggle');
+    const readInputs = () => (clamp(+minEl.value, 0, 99) * 60 + clamp(+secEl.value, 0, 59)) * 1000;
+    const syncToggleLabel = () => { toggleBtn.textContent = TIMER.running ? '⏸ 暫停' : '▶ 開始'; };
+    const load = (ms) => { TIMER.running = false; TIMER.remainingMs = Math.max(0, ms); broadcastTimer(); paintTimer(); syncToggleLabel(); };
+
+    ctrls.querySelector('.tm-set').onclick = () => load(readInputs());
+    ctrls.querySelectorAll('.tm-preset').forEach(b => b.onclick = () => {
+      const sec = +b.dataset.sec; minEl.value = Math.floor(sec / 60); secEl.value = sec % 60; load(sec * 1000);
+    });
+    toggleBtn.onclick = () => {
+      if (TIMER.running) {                              // 暫停：凍結剩餘
+        TIMER.remainingMs = timerRemainingMs(); TIMER.running = false;
+      } else {                                          // 開始／繼續
+        let ms = timerRemainingMs(); if (ms <= 0) ms = readInputs();
+        if (ms <= 0) { flash(p, '請先設定時間'); return; }
+        TIMER.endTime = Date.now() + ms; TIMER.remainingMs = ms; TIMER.running = true;
+      }
+      broadcastTimer(); paintTimer(); syncToggleLabel();
+    };
+    ctrls.querySelector('.tm-reset').onclick = () => load(readInputs());
+    syncToggleLabel();
   }
+
+  side.appendChild(p);
+  ensureTimerLoop();
+  paintTimer();
 }
 
 function rankTable() {
@@ -433,19 +533,6 @@ function cmdText(c) {
   if (c.type === 'move') return `🚶 移動 ${L(c.S)}→${L(c.E)} ${c.n}`;
   if (c.type === 'attack') return `⚔️ 攻擊 ${L(c.S)}→${L(c.E)} ${c.n}`;
   return c.type;
-}
-
-function renderLog(log) {
-  const box = el('div', 'log');
-  const sec = (title, arr) => { if (!arr.length) return; box.appendChild(el('div', 'log-h', title)); arr.forEach(t => box.appendChild(el('div', 'log-line', t))); };
-  sec('🚶 移動階段', log.move);
-  sec('⚔️ 攻擊階段', log.attack);
-  sec('🏋️ 自動訓練', log.train);
-  sec(`${COCO} 資源發放`, log.resource);
-  sec('📌 其他判定', log.notes);
-  if (!log.move.length && !log.attack.length && !log.train.length && !log.notes.length)
-    box.appendChild(el('div', 'log-line', '本回合無任何操作。'));
-  return box;
 }
 
 // ---------------------------------------------------------

@@ -17,8 +17,8 @@ export const RULES = {
   INIT_ISLAND_TROOPS: 500,
   BIG_ISLAND_TROOPS: 500,   // （沿用鍵名，皆 500）
   SMALL_ISLAND_TROOPS: 500,
-  // 每回合基礎椰子產出
-  YIELD: { big: 800, small: 500 },
+  // 每回合基礎椰子產出（大島＝中立黃金洞窟）
+  YIELD: { big: 1000, small: 500 },
   // 豐收
   HARVEST_MULT: 1.5,
   HARVEST_COUNT: 2,         // 每回合隨機豐收島數（最後一回合為全島）

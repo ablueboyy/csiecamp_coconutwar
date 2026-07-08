@@ -178,6 +178,27 @@ input[type=number] { width: 96px; }
 .log-line { font-size: 12.5px; line-height: 1.6; padding: 3px 6px; border-radius: 6px; }
 .log-line:nth-child(even) { background: #fff4d9; }
 
+/* ⏱️ 計時器 */
+.timer-panel { text-align: center; }
+.timer-clock {
+  font-family: "Baloo 2", monospace; font-weight: 800; font-variant-numeric: tabular-nums;
+  font-size: clamp(40px, 6vw, 64px); line-height: 1.05; color: var(--sea-deep);
+  letter-spacing: 1px; margin: 2px 0 10px;
+}
+.timer-clock.ending { color: var(--coral-deep); animation: timerPulse .9s ease-in-out infinite; }
+.timer-clock.zero { color: var(--coral-deep); }
+@keyframes timerPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: .7; } }
+.timer-ctrls { display: flex; flex-direction: column; gap: 8px; }
+.timer-set { display: flex; align-items: flex-end; justify-content: center; gap: 8px; }
+.timer-set label { font-size: 12px; display: flex; flex-direction: column; gap: 2px; font-weight: 700; color: #9a8a68; }
+.timer-set input[type=number] { width: 60px; }
+.timer-presets { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.timer-presets .btn { font-size: 13px; padding: 5px 10px; }
+.timer-btns { display: flex; gap: 8px; }
+.timer-btns .btn { flex: 1; }
+/* 投影視窗：計時器放大、置中吸睛 */
+.view-display .timer-clock { font-size: clamp(64px, 12vw, 140px); }
+
 /* 最終畫面 */
 .podium { max-width: 480px; margin: 20px auto 0; }
 .final-row {

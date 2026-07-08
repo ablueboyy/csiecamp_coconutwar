@@ -5,11 +5,15 @@
 import { GAME, initGame, rollHarvest, exportState, loadState, snapshotBeforeSettle, canRollback, rollbackHistory, prevRoundNo,
   saveGame, loadSavedGame, restoreGame, clearSavedGame } from './state.js';
 import { settleRound } from './engine.js';
-import { renderSetup, renderGame, renderFinal, renderWaiting, renderResume, openSettlement, showSettlementBeat, closeSettlement, revealFinalBonus } from './ui.js';
+import { renderSetup, renderGame, renderFinal, renderWaiting, renderResume, openSettlement, showSettlementBeat, closeSettlement, revealFinalBonus,
+  bindTimerBroadcast, applyTimerState, getTimerState } from './ui.js';
 
 const root = document.getElementById('app');
 const VIEW = new URLSearchParams(location.search).get('view') || 'control';
 const bus = new BroadcastChannel('coconut-wars-3');
+
+// 計時器：主控台變更時廣播給投影視窗
+if (VIEW === 'control') bindTimerBroadcast(t => bus.postMessage({ type: 'timer', timer: t }));
 
 function enterControl() {
   renderGame(root, { view: 'control', onSettle: handleSettle, onOpenDisplay: openDisplay, onRollback: handleRollback });
@@ -90,13 +94,18 @@ function startDisplay() { renderWaiting(root); bus.postMessage({ type: 'hello' }
 
 bus.onmessage = (e) => {
   const m = e.data;
-  if (VIEW === 'control') { if (m.type === 'hello') broadcastState(); return; }
+  if (VIEW === 'control') {
+    // 新開的投影視窗打招呼 → 補送目前盤面與計時器狀態
+    if (m.type === 'hello') { broadcastState(); bus.postMessage({ type: 'timer', timer: getTimerState() }); }
+    return;
+  }
   // 播放視窗
   if (m.type === 'state') { closeSettlement(); loadState(m.state); renderGame(root, { view: 'display' }); }
   else if (m.type === 'settle') { openSettlement(m.log, m.state, false, {}); }
   else if (m.type === 'beat') { showSettlementBeat(m.i); }
   else if (m.type === 'final') { closeSettlement(); loadState(m.state); renderFinal(root, { view: 'display' }); }
   else if (m.type === 'reveal') { revealFinalBonus(); }
+  else if (m.type === 'timer') { applyTimerState(m.timer); }
 };
 
 if (VIEW === 'display') startDisplay(); else startControl();

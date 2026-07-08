@@ -130,7 +130,7 @@ export function teamTotalTroops(teamId) {
   for (const loc of Object.values(GAME.locations)) t += loc.garrison[teamId] || 0;
   return t;
 }
-// 島嶼本回合椰子產出 = 基礎(大800/小500)，豐收島 ×1.5
+// 島嶼本回合椰子產出 = 基礎(大1000/小500)，豐收島 ×1.5
 export function islandYield(loc) {
   const base = RULES.YIELD[loc.type];
   return isHarvest(loc.id) ? Math.round(base * RULES.HARVEST_MULT) : base;
