@@ -54,7 +54,8 @@ export function initGame({ numTeams, numRounds, ownership, totals, bonuses }) {
 export function rollHarvest() {
   const ids = ISLANDS.map(i => i.id);
   if (GAME.round >= GAME.numRounds) { GAME.harvest = ids.slice(); return; }
-  const pool = ids.slice();
+  // 非最後回合：黃金洞窟（大島）不參與隨機豐收，只在最後一回合全島大豐收時才吃 ×1.5
+  const pool = ISLANDS.filter(i => i.type !== 'big').map(i => i.id);
   const pick = [];
   for (let k = 0; k < RULES.HARVEST_COUNT && pool.length; k++) {
     pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
