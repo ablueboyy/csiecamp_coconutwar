@@ -68,6 +68,7 @@ function renderCommand(root, teamId) {
     <div class="ct-tpls">
       <button class="btn tpl" data-t="move">🚶 移動</button>
       <button class="btn tpl" data-t="attack">⚔️ 攻擊</button>
+      <button class="btn ghost ct-pass">🏳️ 放棄（不操作）</button>
     </div>
     <div id="ctForm" class="cmd-form"></div>
     <div id="ctList" class="cmd-list"></div>
@@ -120,17 +121,24 @@ function renderCommand(root, teamId) {
       <div class="frow">
         <label>出發 <select name="S">${srcOpts}</select></label>
         <label>${t === 'move' ? '目的' : '目標'} <select name="E">${targetOpts}</select></label>
-        <label>兵力 <input name="n" type="number" step="100" min="100" max="9900" value="${dv}"></label>
+        <label>兵力 <input name="n" type="number" step="100" min="100" max="99900" value="${dv}"></label>
       </div>
       <button class="btn primary ct-add">＋ 加入</button>`;
     $('.ct-add', form).onclick = () => {
       const g = n => form.querySelector(`[name="${n}"]`).value;
       const n = +g('n');
       if (!n || n % 100) { flash(card, '兵力須為 100 的倍數'); return; }
-      if (n > 9900) { flash(card, '兵力上限 9900'); return; }
+      if (n > 99900) { flash(card, '兵力上限 99900'); return; }
       addCmd({ type: t, S: g('S'), E: g('E'), n, team: teamId });
     };
   });
+
+  // 放棄本回合：清空所有指令，代碼即為「不操作」代碼（可直接複製報給主持人）
+  $('.ct-pass', card).onclick = () => {
+    if (cmds.length && !window.confirm('放棄本回合會清除已加入的指令，確定嗎？')) return;
+    cmds.length = 0; form.innerHTML = ''; refreshList();
+    flash(card, '✅ 已設為放棄本回合，請直接複製下方代碼');
+  };
 
   $('#ctCopy', codeCard).onclick = () => {
     const code = codeEl.textContent;

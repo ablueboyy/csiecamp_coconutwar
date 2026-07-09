@@ -88,6 +88,11 @@ export function settleRound() {
     log.events.push({ phase: 'attack', kind: 'sword', from: elOf(c.team, c.S), to: elIsl(c.E), team: c.team, n: c.n });
   }
 
+  // 中繼盤面：移動 + 攻擊出兵「都扣完、但還沒判定戰役」的快照。
+  // 給結算動畫用：一進入攻擊階段就把地圖切到這張，讓派出去攻擊/移動的兵
+  // 立刻從原島扣掉，防守島不會再顯示「已派去打別島」的兵。
+  log.midState = buildMidState(barracks, garrison);
+
   // 退兵累計（回原本的出發地）：retreatMap[team][srcKey] = 兵
   const retreatMap = {};
   const queueRetreat = (team, sources, committed, back) => {
@@ -206,6 +211,25 @@ export function settleRound() {
 }
 
 function cn(t) { return { move: '移動', attack: '攻擊', train: '訓練' }[t] || t; }
+
+// 中繼盤面快照（可直接餵給 state.loadState 重畫地圖）。
+// teams：兵營＝出兵扣完後的工作值（尚未訓練）；locations：守軍＝工作副本、owner 維持戰前。
+function buildMidState(barracks, garrison) {
+  const teams = {};
+  for (const [tid, t] of Object.entries(GAME.teams)) {
+    teams[tid] = { ...t, barracks: Math.max(0, Math.round(barracks[tid] || 0)) };
+  }
+  const locations = {};
+  for (const [id, loc] of Object.entries(GAME.locations)) {
+    const g = {};
+    for (const [t, n] of Object.entries(garrison[id] || {})) { const v = Math.round(n); if (v > 0) g[t] = v; }
+    locations[id] = { ...loc, garrison: g };   // owner 維持戰前（戰役尚未判定）
+  }
+  return {
+    numTeams: GAME.numTeams, numRounds: GAME.numRounds, round: GAME.round,
+    phase: GAME.phase, teams, locations, harvest: GAME.harvest.slice(), log: [],
+  };
+}
 
 // ---------------------------------------------------------
 // 攻擊裁決

@@ -569,6 +569,13 @@ function buildBeats(log) {
 
   const upd = beats.find(bt => bt.type === 'train' || bt.type === 'resource' || bt.type === 'recap');
   if (upd) upd.updateBoard = true;
+
+  // 進入攻擊階段就把地圖切到中繼盤面（出兵已扣、戰役未判），
+  // 讓防守島不再顯示已派出去攻擊/移動的兵。優先掛在第一場戰役，其次移動階段。
+  if (log.midState) {
+    const midAnchor = beats.find(bt => bt.type === 'battle-intro') || beats.find(bt => bt.type === 'move');
+    if (midAnchor) { midAnchor.updateBoardMid = true; midAnchor.midState = log.midState; }
+  }
   return beats;
 }
 
@@ -587,7 +594,7 @@ export function openSettlement(log, postState, control, cbs) {
     overlay.appendChild(nav);
   }
   document.body.appendChild(overlay);
-  SETTLE = { beats, overlay, card, nav, i: -1, postState, control, cbs, boardDone: false };
+  SETTLE = { beats, overlay, card, nav, i: -1, postState, control, cbs, boardDone: false, midDone: false };
 
   if (control) {
     const next = () => advanceSettlement();
@@ -633,6 +640,15 @@ function applyBeatEffects(b) {
     if (SETTLE.postState) loadState(SETTLE.postState);
     const board = document.getElementById('board');
     if (board) { renderBoard(board); requestAnimationFrame(fitOcean); }
+  }
+  // 攻擊階段起始：切到中繼盤面（出兵已扣、戰役未判）。boardDone 後不再覆蓋。
+  if (b.updateBoardMid && !SETTLE.midDone && !SETTLE.boardDone) {
+    SETTLE.midDone = true;
+    if (b.midState) {
+      loadState(b.midState);
+      const board = document.getElementById('board');
+      if (board) { renderBoard(board); requestAnimationFrame(fitOcean); }
+    }
   }
   const ov = SETTLE.overlay;
   if (b.type === 'move' && b.moveEvents) b.moveEvents.forEach((e, i) => setTimeout(() => moveToken(ov, e, 'person'), i * 200));

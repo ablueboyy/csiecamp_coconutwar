@@ -5,23 +5,24 @@
  * 因此不需要另存「指令數」，編號本身就隱含長度，長度即資訊理論最短。
  *
  * 單一指令的可能數 C：
- *   移動/攻擊各 N×N×H 種（N=位置數、H=兵力百數1..99），訓練已改為自動、非指令。
+ *   移動/攻擊各 N×N×H 種（N=位置數、H=兵力百數1..999），訓練已改為自動、非指令。
  *   C = 2·N·N·H
  * 指令串（長度 0..3）用混合基數雙射：
  *   enc([])            = 0
  *   enc(c :: 其餘)     = 1 + c + C · enc(其餘)
- * 代碼格式：[隊號1位][編號(十進位)][檢查碼1位]
- *   放棄=3 位、1 指令≤7 位、2 指令≤12 位、3 指令≤16 位。
+ * 代碼格式：[隊號1位][編號(固定位數、前導補0)][檢查碼1位]
+ *   所有代碼等長（隊號1 + 編號 WIDTH + 檢查碼1）；放棄＝編號全 0。
  * 檢查碼可擋下打錯（純數字密碼本身無容錯，故保留 1 位防呆）。
  * ========================================================= */
 import { ISLANDS } from './config.js';
 
 const LOCS = ['B', ...ISLANDS.map(i => i.id)];   // 0=兵營，其餘為島 id
 const N = LOCS.length;      // 位置數（兵營 + 島嶼）
-const H = 99;               // 兵力百數 1..99（100~9900）
+const H = 999;              // 兵力百數 1..999（100~99900，支援五位數兵力）
 const MOVE = N * N * H;     // 移動（或攻擊）各自的種數
 const C = 2 * MOVE;         // 單一指令總種數（移動 + 攻擊）
 const MAX3 = (() => { let c = 1; for (let k = 0; k < 3; k++) c = 1 + C * c; return c; })();   // 長度≤3 的總數
+const WIDTH = String(MAX3 - 1).length;   // 編號固定位數：不足補前導 0，讓所有人代碼等長
 
 const locIdx = id => { const i = LOCS.indexOf(id); return i < 0 ? 0 : i; };
 const idxLoc = i => LOCS[i] || 'B';
@@ -57,7 +58,8 @@ function decList(x, team) {
 
 // 對外 ----------------------------------------------------
 export function encodeCode(team, cmds) {
-  const body = String(team) + String(encList((cmds || []).slice(0, 3)));
+  const num = String(encList((cmds || []).slice(0, 3))).padStart(WIDTH, '0');   // 補前導 0 → 等長
+  const body = String(team) + num;
   return body + checksum(body);
 }
 
