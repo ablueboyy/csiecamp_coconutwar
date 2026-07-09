@@ -316,6 +316,18 @@ input[type=number] { width: 96px; }
   font-family: "Baloo 2"; font-size: 11px; color: #fff; background: var(--c);
   padding: 0 6px; border-radius: 999px; margin-top: -3px; box-shadow: 0 1px 3px rgba(0,0,0,.4);
 }
+/* 突圍者海鷗：黃色邊框 + 脈動，準備與守軍決戰 */
+.token.breakout { z-index: 1002; animation: breakoutPulse 1s ease-in-out infinite; }
+.token.breakout .tok-icon {
+  outline: 3px solid #ffd24a; border-radius: 10px; background: rgba(255,210,74,.28);
+  box-shadow: 0 0 12px 3px #ffd24a;
+}
+@keyframes breakoutPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.16); }
+}
+/* 撲向守軍：停止脈動、較快位移 */
+.token.charge { z-index: 1003; animation: none; transition: left .5s ease-in, top .5s ease-in, opacity .4s, transform .4s; }
 
 .flag-pop {
   position: fixed; transform: translate(-50%, -10px) scale(.3); z-index: 1000;

@@ -113,7 +113,7 @@ export function settleRound() {
     const defTeam = loc.owner;
     const defTroops = defTeam != null ? (garrison[E][defTeam] || 0) : 0;
 
-    const { outcome, retreats, steps } = resolveBattle(attackList, defTeam, defTroops);
+    const { outcome, retreats, steps, steps1, steps2, challenger } = resolveBattle(attackList, defTeam, defTroops);
     // 各隊退兵 → 依來源比例回到原地
     for (const [team, back] of Object.entries(retreats)) {
       const rec = atk[team];
@@ -130,7 +130,7 @@ export function settleRound() {
       island: E, label: loc.label,
       attackers: attackList.map(a => ({ team: a.team, troops: a.troops })),
       defTeam: defTroops > 0 ? defTeam : null, defTroops,
-      steps, outcome,
+      steps, steps1, steps2, challenger, outcome,
     });
     log.events.push({ phase: 'attack', kind: 'clash', at: elIsl(E),
       result: outcome.type === 'capture' ? `${outcome.team}小佔領 ${loc.label}（剩 ${outcome.troops}）`
@@ -236,23 +236,29 @@ function buildMidState(barracks, garrison) {
 // 第一階段：攻方比最高。唯一最高＝突圍者，其餘退回原地（保留兵力）。
 //   平手最高 → 各折損 500（不足扣光），剩餘退回原地、喪失資格；較低者留場，重複。
 // 第二階段：突圍者 vs 守軍相減（同 2.0）。
-// 回傳 { outcome, retreats:{team:兵}, steps:[文字] }
+// 回傳 { outcome, retreats:{team:兵}, steps, steps1(第一階段文字), steps2(第二階段文字), challenger(突圍者隊號或null) }
 // ---------------------------------------------------------
 function resolveBattle(attackList, defTeam, defTroops) {
   let atk = attackList.filter(a => a.troops > 0).map(a => ({ ...a }));
-  const retreats = {}, steps = [];
+  const retreats = {}, steps1 = [], steps2 = [];
   let challenger = null, guard = 0;
 
+  // 第一階段：攻方互比，決出唯一突圍者
   while (guard++ < 200) {
     if (atk.length === 0) break;
-    if (atk.length === 1) { challenger = atk[0]; break; }
+    if (atk.length === 1) {
+      challenger = atk[0];
+      if (attackList.length > 1) steps1.push(`${challenger.team}小 勝出，成為突圍者`);
+      break;
+    }
     const max = Math.max(...atk.map(a => a.troops));
     const tied = atk.filter(a => a.troops === max);
     if (tied.length === 1) {
       challenger = tied[0];
       const losers = atk.filter(a => a !== challenger);
       for (const l of losers) retreats[l.team] = (retreats[l.team] || 0) + l.troops;
-      if (losers.length) steps.push(`${losers.map(l => l.team + '小').join('、')} 非最高，退回原地、喪失攻擊資格`);
+      if (losers.length) steps1.push(`${losers.map(l => l.team + '小').join('、')} 非最高，退回原地、喪失攻擊資格`);
+      steps1.push(`${challenger.team}小 以最高 ${max} 突圍`);
       break;
     }
     // 平手：各折損 500（不足扣光），剩餘退回原地、出局
@@ -262,30 +268,33 @@ function resolveBattle(attackList, defTeam, defTroops) {
       p.troops -= loss;
       retreats[p.team] = (retreats[p.team] || 0) + p.troops;
     }
-    steps.push(`${tied.map(p => p.team + '小').join('、')} 同為最高 ${max} → 各折損 ${RULES.TIE_LOSS} 後退回原地、喪失攻擊資格`);
+    steps1.push(`${tied.map(p => p.team + '小').join('、')} 同為最高 ${max} → 各折損 ${RULES.TIE_LOSS} 後退回原地、喪失攻擊資格`);
     atk = atk.filter(a => !tiedSet.has(a));
   }
 
+  const chTeam = challenger ? challenger.team : null;
+  const done = outcome => ({ outcome, retreats, steps: [...steps1, ...steps2], steps1, steps2, challenger: chTeam });
+
   // 第二階段：突圍者 vs 守軍
   if (!challenger) {
-    if (defTroops > 0) { steps.push(`守方 ${defTeam}小 無人突圍，守住（留 ${defTroops} 兵）`); return { outcome: { type: 'hold', troops: defTroops }, retreats, steps }; }
-    steps.push('攻方全數退場，維持空島');
-    return { outcome: { type: 'neutral' }, retreats, steps };
+    if (defTroops > 0) { steps2.push(`守方 ${defTeam}小 無人突圍，守住（留 ${defTroops} 兵）`); return done({ type: 'hold', troops: defTroops }); }
+    steps2.push('攻方全數退場，維持空島');
+    return done({ type: 'neutral' });
   }
   if (defTroops === 0) {
-    steps.push(`${challenger.team}小 以 ${challenger.troops} 兵佔領無守軍島嶼（留 ${challenger.troops}）`);
-    return { outcome: { type: 'capture', team: challenger.team, troops: challenger.troops }, retreats, steps };
+    steps2.push(`${challenger.team}小 以 ${challenger.troops} 兵佔領無守軍島嶼（留 ${challenger.troops}）`);
+    return done({ type: 'capture', team: challenger.team, troops: challenger.troops });
   }
   if (challenger.troops > defTroops) {
     const left = challenger.troops - defTroops;
-    steps.push(`${challenger.team}小 ${challenger.troops} 攻破守軍 ${defTroops}，佔領（扣守軍後留 ${left} 兵）`);
-    return { outcome: { type: 'capture', team: challenger.team, troops: left }, retreats, steps };
+    steps2.push(`${challenger.team}小 ${challenger.troops} 攻破守軍 ${defTroops}，佔領（扣守軍後留 ${left} 兵）`);
+    return done({ type: 'capture', team: challenger.team, troops: left });
   }
   if (challenger.troops < defTroops) {
     const left = defTroops - challenger.troops;
-    steps.push(`守方 ${defTeam}小 ${defTroops} 擋下 ${challenger.team}小 ${challenger.troops}，守住（留 ${left} 兵）`);
-    return { outcome: { type: 'hold', troops: left }, retreats, steps };
+    steps2.push(`守方 ${defTeam}小 ${defTroops} 擋下 ${challenger.team}小 ${challenger.troops}，守住（留 ${left} 兵）`);
+    return done({ type: 'hold', troops: left });
   }
-  steps.push(`${challenger.team}小 ${challenger.troops} 與守軍 ${defTroops} 同歸於盡，成無人空島`);
-  return { outcome: { type: 'neutral' }, retreats, steps };
+  steps2.push(`${challenger.team}小 ${challenger.troops} 與守軍 ${defTroops} 同歸於盡，成無人空島`);
+  return done({ type: 'neutral' });
 }

@@ -555,11 +555,22 @@ function buildBeats(log) {
     const swordEvents = (log.events || []).filter(e => e.phase === 'attack' && e.kind === 'sword' && e.to === `isl-${b.island}`);
     const atkLine = b.attackers.map(a => `${a.team}小 ${a.troops}`).join('　') || '（無）';
     const defLine = b.defTroops > 0 ? `🛡️ 守軍 ${b.defTeam}小 ${b.defTroops}` : '🛡️（此島無守軍）';
+    // 派兵抵達：海鷗飛到島上「停留」（不立即消失）
     beats.push({ type: 'battle-intro', island: b.island, title: `⚔️ ${b.label} 爭奪戰`,
       lines: [`參戰：${atkLine}`, defLine], swordEvents, color: '#ff6f61' });
-    b.steps.forEach((s, i) => {
-      const last = i === b.steps.length - 1;
-      beats.push({ type: 'battle-step', island: b.island, title: `⚔️ ${b.label}`, lines: [s], color: '#ff6f61', capture: last ? b.outcome : null });
+
+    // 第一階段：決出突圍者 → 突圍海鷗發黃框、其餘退場
+    const p1lines = (b.steps1 && b.steps1.length) ? b.steps1
+      : (b.challenger != null ? [`${b.challenger}小 為唯一攻方，直接突圍`] : ['攻方無人突圍']);
+    beats.push({ type: 'battle-p1', island: b.island, title: `⚔️ ${b.label}｜第一階段：決出突圍者`,
+      lines: p1lines, challenger: b.challenger, color: '#ffb703' });
+
+    // 第二階段：突圍者（黃框海鷗）與島上守軍決戰
+    const s2 = (b.steps2 && b.steps2.length) ? b.steps2 : b.steps;
+    s2.forEach((s, i) => {
+      const last = i === s2.length - 1;
+      beats.push({ type: 'battle-p2', island: b.island, title: `⚔️ ${b.label}｜第二階段：突圍者 vs 守軍`,
+        lines: [s], challenger: b.challenger, color: '#ff6f61', capture: last ? b.outcome : null });
     });
   }
 
@@ -594,7 +605,7 @@ export function openSettlement(log, postState, control, cbs) {
     overlay.appendChild(nav);
   }
   document.body.appendChild(overlay);
-  SETTLE = { beats, overlay, card, nav, i: -1, postState, control, cbs, boardDone: false, midDone: false };
+  SETTLE = { beats, overlay, card, nav, i: -1, postState, control, cbs, boardDone: false, midDone: false, battleTokens: {} };
 
   if (control) {
     const next = () => advanceSettlement();
@@ -652,8 +663,16 @@ function applyBeatEffects(b) {
   }
   const ov = SETTLE.overlay;
   if (b.type === 'move' && b.moveEvents) b.moveEvents.forEach((e, i) => setTimeout(() => moveToken(ov, e, 'person'), i * 200));
-  if (b.type === 'battle-intro' && b.swordEvents) b.swordEvents.forEach((e, i) => setTimeout(() => moveToken(ov, e, 'sword'), i * 200));
-  if (b.type === 'battle-step' && b.capture) { burst(ov, `isl-${b.island}`); flashIsland(b.island); }
+  // 攻擊：海鷗飛到島上停留（不消失），待兩階段戰鬥結束才退場
+  if (b.type === 'battle-intro' && b.swordEvents) b.swordEvents.forEach((e, i) => setTimeout(() => spawnBattleSeagull(ov, e, b.island, i, b.swordEvents.length), i * 200));
+  // 第一階段：突圍海鷗發黃框、其餘退場
+  if (b.type === 'battle-p1') markBreakout(b.island, b.challenger);
+  // 第二階段（最後一步）：突圍海鷗撲向守軍 → 爆擊 → 全部海鷗退場
+  if (b.type === 'battle-p2' && b.capture) {
+    chargeBreakout(ov, b.island, b.challenger);
+    burst(ov, `isl-${b.island}`); flashIsland(b.island);
+    setTimeout(() => clearBattleSeagulls(b.island), 700);
+  }
   if (b.type === 'train' && b.trainEvents) b.trainEvents.forEach(e => riseTrain(ov, e.at, e.gain));
   if (b.type === 'resource' && b.coconutEvents) b.coconutEvents.forEach((e, i) => setTimeout(() => riseCoconut(ov, e.at, e.coconut, e.harvest), i * 80));
 }
@@ -706,6 +725,53 @@ function burst(overlay, at) {
   const b = el('div', 'clash', '💥'); b.style.left = c.x + 'px'; b.style.top = c.y + 'px';
   overlay.appendChild(b); void b.offsetWidth; b.classList.add('show');
   setTimeout(() => b.remove(), 1000);
+}
+
+// --- 攻擊海鷗：飛到島上停留、兩階段戰鬥後才退場 ----------------------
+// 派兵抵達：海鷗從出發地飛到島上、圍成一排停住（不淡出），記在 SETTLE.battleTokens[island]
+function spawnBattleSeagull(overlay, e, island, idx = 0, total = 1) {
+  if (!SETTLE) return;
+  const from = centerOf(e.from), to = centerOf(`isl-${island}`); if (!from || !to) return;
+  const color = GAME.teams[e.team]?.color || '#fff';
+  const tok = el('div', 'token battle-tok'); tok.style.setProperty('--c', color);
+  tok.innerHTML = `<img class="tok-icon" src="assets/img/attack.png" alt=""><b>${e.n}</b>`;
+  tok.style.left = from.x + 'px'; tok.style.top = from.y + 'px';
+  overlay.appendChild(tok); void tok.offsetWidth;
+  const tx = to.x + (idx - (total - 1) / 2) * 46, ty = to.y - 8;   // 圍在島嶼上方一橫排
+  tok.style.left = tx + 'px'; tok.style.top = ty + 'px'; tok.style.opacity = '1';
+  (SETTLE.battleTokens[island] = SETTLE.battleTokens[island] || []).push({ team: e.team, el: tok });
+}
+// 第一階段：突圍者海鷗發黃框；其餘（未突圍）淡出退場
+function markBreakout(island, challenger) {
+  if (!SETTLE) return;
+  for (const t of (SETTLE.battleTokens[island] || [])) {
+    if (challenger != null && t.team === challenger) {
+      t.el.classList.add('breakout');
+    } else {
+      t.retreated = true;
+      t.el.style.opacity = '0'; t.el.style.transform = 'translate(-50%,-50%) scale(.4)';
+      const node = t.el; setTimeout(() => node.remove(), 700);
+    }
+  }
+}
+// 第二階段：突圍海鷗撲向島上守軍位置（決戰）
+function chargeBreakout(overlay, island, challenger) {
+  if (!SETTLE || challenger == null) return;
+  const c = centerOf(`isl-${island}`); if (!c) return;
+  for (const t of (SETTLE.battleTokens[island] || [])) {
+    if (t.retreated || t.team !== challenger) continue;
+    t.el.classList.add('charge');
+    t.el.style.left = c.x + 'px'; t.el.style.top = c.y + 'px';
+  }
+}
+// 戰鬥結束：把該島剩餘海鷗全部退場
+function clearBattleSeagulls(island) {
+  if (!SETTLE) return;
+  for (const t of (SETTLE.battleTokens[island] || [])) {
+    const node = t.el; node.style.opacity = '0'; node.style.transform = 'translate(-50%,-50%) scale(.4)';
+    setTimeout(() => node.remove(), 500);
+  }
+  SETTLE.battleTokens[island] = [];
 }
 function riseCoconut(overlay, at, coconut, harvest) {
   const c = centerOf(at); if (!c) return;
