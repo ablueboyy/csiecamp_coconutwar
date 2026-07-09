@@ -10,8 +10,11 @@
  * 指令串（長度 0..3）用混合基數雙射：
  *   enc([])            = 0
  *   enc(c :: 其餘)     = 1 + c + C · enc(其餘)
- * 代碼格式：[隊號1位][編號(固定位數、前導補0)][檢查碼1位]
- *   所有代碼等長（隊號1 + 編號 WIDTH + 檢查碼1）；放棄＝編號全 0。
+ * 再把「隊號 × MAX3 + 指令編號」壓成單一整數 combined，用仿射變換
+ *   y = (combined · A + B) mod SPACE   （A 與 SPACE 互質 → 雙射、可逆）
+ * 打散成看起來雜亂的亂碼，最後補前導 0 到固定位數、附 1 位檢查碼。
+ * 好處：隊號被藏進亂數、放棄（combined=0）不再是一串 0、相鄰指令的碼天差地遠。
+ * 用 BigInt 做精確大數模運算；解碼時反算 combined 再拆回隊號與指令。
  * 檢查碼可擋下打錯（純數字密碼本身無容錯，故保留 1 位防呆）。
  * ========================================================= */
 import { ISLANDS } from './config.js';
@@ -22,7 +25,18 @@ const H = 999;              // 兵力百數 1..999（100~99900，支援五位數
 const MOVE = N * N * H;     // 移動（或攻擊）各自的種數
 const C = 2 * MOVE;         // 單一指令總種數（移動 + 攻擊）
 const MAX3 = (() => { let c = 1; for (let k = 0; k < 3; k++) c = 1 + C * c; return c; })();   // 長度≤3 的總數
-const WIDTH = String(MAX3 - 1).length;   // 編號固定位數：不足補前導 0，讓所有人代碼等長
+
+// --- 打散（affine over Z_SPACE）：讓代碼看起來雜亂、隊號與放棄都不易辨識 ---
+const TEAMS = 10;                                 // 隊號 0..9（單一位數）
+const SPACE = BigInt(TEAMS) * BigInt(MAX3);       // 組合總數 = 10 × MAX3
+const WIDTH = String(SPACE - 1n).length;          // 代碼編號固定位數
+const LEAD = 10n ** BigInt(WIDTH - 1);            // 加此位移 → 首位必非 0（避免朗讀/輸入吃掉前導 0）
+const A = 2305843009213693951n % SPACE;           // 乘數（梅森質數 2^61-1，必與 SPACE 互質）
+const B = 61803398874989484n % SPACE;             // 位移（讓 combined=0 的放棄碼不落在 0）
+function egcd(a, b) { let x0 = 1n, x1 = 0n; while (b) { const q = a / b; [a, b] = [b, a - q * b]; [x0, x1] = [x1, x0 - q * x1]; } return [a, x0]; }
+const Ainv = (() => { const [g, x] = egcd(A, SPACE); if (g !== 1n) throw new Error('code.js: A 與 SPACE 不互質'); return ((x % SPACE) + SPACE) % SPACE; })();
+const scramble = combined => (combined * A + B) % SPACE;
+const unscramble = y => (((y - B) % SPACE + SPACE) % SPACE * Ainv) % SPACE;
 
 const locIdx = id => { const i = LOCS.indexOf(id); return i < 0 ? 0 : i; };
 const idxLoc = i => LOCS[i] || 'B';
@@ -58,20 +72,24 @@ function decList(x, team) {
 
 // 對外 ----------------------------------------------------
 export function encodeCode(team, cmds) {
-  const num = String(encList((cmds || []).slice(0, 3))).padStart(WIDTH, '0');   // 補前導 0 → 等長
-  const body = String(team) + num;
-  return body + checksum(body);
+  const enc = encList((cmds || []).slice(0, 3));
+  const combined = BigInt(team) * BigInt(MAX3) + BigInt(enc);   // 隊號與指令壓成單一整數
+  const num = (scramble(combined) + LEAD).toString();           // + LEAD → 固定 WIDTH 位、首位非 0
+  return num + checksum(num);
 }
 
 export function decodeCode(raw) {
   const str = String(raw).replace(/\D/g, '');
-  if (str.length < 3) return { error: '代碼太短' };
-  const body = str.slice(0, -1);
-  if (checksum(body) !== +str.slice(-1)) return { error: '檢查碼錯誤（可能輸入有誤）' };
-  const team = +body[0];
-  const x = Number(body.slice(1));
-  if (!Number.isSafeInteger(x) || x < 0 || x >= MAX3) return { error: '代碼超出範圍' };
-  const cmds = decList(x, team);
+  if (str.length < 2) return { error: '代碼太短' };
+  const num = str.slice(0, -1);
+  if (checksum(num) !== +str.slice(-1)) return { error: '檢查碼錯誤（可能輸入有誤）' };
+  let y;
+  try { y = BigInt(num) - LEAD; } catch (_) { return { error: '代碼格式錯誤' }; }
+  if (y < 0n || y >= SPACE) return { error: '代碼超出範圍' };
+  const combined = unscramble(y);
+  const team = Number(combined / BigInt(MAX3));
+  const enc = Number(combined % BigInt(MAX3));
+  const cmds = decList(enc, team);
   if (!cmds) return { error: '代碼無效（指令過多）' };
   return { team, cmds };
 }
