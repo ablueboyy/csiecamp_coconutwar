@@ -5,7 +5,7 @@
  *       選出唯一突圍者後與守軍相減。
  * ========================================================= */
 import { RULES } from './config.js';
-import { GAME, garrisonTotal, isHarvest } from './state.js';
+import { GAME, garrisonTotal, isHarvest, exportState } from './state.js';
 
 const COCO = '<img class="coco-ic" src="assets/img/coconut.png" alt="椰子">';
 
@@ -13,6 +13,9 @@ const COCO = '<img class="coco-ic" src="assets/img/coconut.png" alt="椰子">';
 
 export function settleRound() {
   const log = { round: GAME.round, move: [], attack: [], train: [], resource: [], notes: [], events: [], battles: [], recap: [] };
+
+  // 結算前盤面快照（給結算「回上一步」還原地圖用；此時尚未任何扣兵/判定）
+  log.preState = exportState();
 
   // 回合開始快照（給「本回合回顧」用）
   const preOwner = {};

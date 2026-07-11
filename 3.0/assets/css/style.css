@@ -439,6 +439,8 @@ input[type=number] { width: 96px; }
 .settle-hint b { color: var(--coral-deep); }
 .settle-prog { font-family: "Baloo 2"; font-weight: 800; color: var(--sea-deep); font-size: 15px; }
 .settle-next { font-size: 16px; padding: 10px 22px; }
+.settle-prev { font-size: 15px; padding: 9px 16px; }
+.settle-prev:disabled { opacity: .45; }
 
 /* 回合回顧表 */
 .recap-table { width: 100%; border-collapse: collapse; font-size: clamp(14px, 1.7vw, 21px); margin-top: 14px; }

@@ -34,7 +34,7 @@ function handleSettle() {
   bus.postMessage({ type: 'settle', log, state: postState });   // 播放視窗建同一份節目單
 
   openSettlement(log, postState, true, {
-    onAdvance: (i) => bus.postMessage({ type: 'beat', i }),      // 每步同步給播放視窗
+    onAdvance: (i, back) => bus.postMessage({ type: 'beat', i, back }), // 每步同步給播放視窗（back=回上一步）
     onFinish: () => {
       if (GAME.round >= GAME.numRounds) {
         GAME.phase = 'done';
@@ -102,7 +102,7 @@ bus.onmessage = (e) => {
   // 播放視窗
   if (m.type === 'state') { closeSettlement(); loadState(m.state); renderGame(root, { view: 'display' }); }
   else if (m.type === 'settle') { openSettlement(m.log, m.state, false, {}); }
-  else if (m.type === 'beat') { showSettlementBeat(m.i); }
+  else if (m.type === 'beat') { showSettlementBeat(m.i, m.back); }
   else if (m.type === 'final') { closeSettlement(); loadState(m.state); renderFinal(root, { view: 'display' }); }
   else if (m.type === 'reveal') { revealFinalBonus(); }
   else if (m.type === 'timer') { applyTimerState(m.timer); }

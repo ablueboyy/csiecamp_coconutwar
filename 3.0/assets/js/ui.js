@@ -600,17 +600,28 @@ export function openSettlement(log, postState, control, cbs) {
   let nav = null;
   if (control) {
     nav = el('div', 'settle-nav');
-    nav.innerHTML = `<span class="settle-hint">按 <b>空白鍵</b> 或點「下一步」揭曉</span>
+    nav.innerHTML = `<span class="settle-hint">按 <b>空白鍵</b> 揭曉；按 <b>←</b> 回上一步</span>
+      <button class="btn ghost settle-prev">◂ 上一步</button>
       <span class="settle-prog"></span><button class="btn primary settle-next">下一步 ▸</button>`;
     overlay.appendChild(nav);
   }
   document.body.appendChild(overlay);
-  SETTLE = { beats, overlay, card, nav, i: -1, postState, control, cbs, boardDone: false, midDone: false, battleTokens: {} };
+  // 地圖切換點：進攻中繼盤面（mid）與結算後盤面（post）分別落在哪一格，
+  // 供「回上一步」依索引還原正確地圖（preState=結算前、midState、postState）。
+  const midIdx = beats.findIndex(bt => bt.updateBoardMid);
+  const postIdx = beats.findIndex(bt => bt.updateBoard);
+  SETTLE = { beats, overlay, card, nav, i: -1, postState, control, cbs, battleTokens: {},
+    preState: log.preState, midState: log.midState, midIdx, postIdx, boardShown: null };
 
   if (control) {
     const next = () => advanceSettlement();
+    const prev = () => goBackSettlement();
     nav.querySelector('.settle-next').onclick = next;
-    SETTLE.key = e => { if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); next(); } };
+    nav.querySelector('.settle-prev').onclick = prev;
+    SETTLE.key = e => {
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); prev(); }
+    };
     window.addEventListener('keydown', SETTLE.key);
   }
   showBeat(0);
@@ -621,11 +632,19 @@ function advanceSettlement() {
   const ni = SETTLE.i + 1;
   if (ni >= SETTLE.beats.length) { const cbs = SETTLE.cbs; closeSettlement(); if (cbs && cbs.onFinish) cbs.onFinish(); return; }
   showBeat(ni);
-  if (SETTLE.cbs && SETTLE.cbs.onAdvance) SETTLE.cbs.onAdvance(ni);
+  if (SETTLE.cbs && SETTLE.cbs.onAdvance) SETTLE.cbs.onAdvance(ni, false);
 }
 
-// 播放端：收到 beat 索引 → 顯示同一格
-export function showSettlementBeat(i) { if (SETTLE) showBeat(i); }
+// 回上一步：避免主持人手滑按太快；回退不重播動畫，並依索引還原地圖。
+function goBackSettlement() {
+  if (!SETTLE || SETTLE.i <= 0) return;
+  const pi = SETTLE.i - 1;
+  showBeat(pi, true);
+  if (SETTLE.cbs && SETTLE.cbs.onAdvance) SETTLE.cbs.onAdvance(pi, true);
+}
+
+// 播放端：收到 beat 索引 → 顯示同一格（back=true 表示回上一步，不重播動畫）
+export function showSettlementBeat(i, back) { if (SETTLE) showBeat(i, back); }
 export function closeSettlement() {
   if (!SETTLE) return;
   if (SETTLE.key) window.removeEventListener('keydown', SETTLE.key);
@@ -633,7 +652,7 @@ export function closeSettlement() {
   SETTLE = null;
 }
 
-function showBeat(i) {
+function showBeat(i, back = false) {
   if (!SETTLE) return;
   SETTLE.i = i;
   const b = SETTLE.beats[i];
@@ -641,30 +660,39 @@ function showBeat(i) {
   if (SETTLE.nav) {
     SETTLE.nav.querySelector('.settle-prog').textContent = `${i + 1} / ${SETTLE.beats.length}`;
     SETTLE.nav.querySelector('.settle-next').textContent = i === SETTLE.beats.length - 1 ? '完成 ✓' : '下一步 ▸';
+    const prevBtn = SETTLE.nav.querySelector('.settle-prev');
+    if (prevBtn) prevBtn.disabled = i <= 0;
   }
-  applyBeatEffects(b);
+  syncBoard(i);
+  // 回上一步時只還原畫面，不重播動畫（海鷗/移動/爆擊）；前進才播動畫。
+  if (!back) applyBeatEffects(b);
+}
+
+// 依目前索引還原正確地圖：結算前(pre) → 進攻中繼(mid) → 結算後(post)。
+// 前進與回退都走這裡，只有跨越切換點時才真的重載，避免重複渲染。
+function syncBoard(i) {
+  const { midIdx, postIdx } = SETTLE;
+  let target = 'pre';
+  if (postIdx >= 0 && i >= postIdx) target = 'post';
+  else if (midIdx >= 0 && i >= midIdx) target = 'mid';
+  if (target === SETTLE.boardShown) return;
+  const state = target === 'post' ? SETTLE.postState : target === 'mid' ? SETTLE.midState : SETTLE.preState;
+  if (!state) return;
+  SETTLE.boardShown = target;
+  loadState(state);
+  const board = document.getElementById('board');
+  if (board) { renderBoard(board); requestAnimationFrame(fitOcean); }
 }
 
 function applyBeatEffects(b) {
-  if (b.updateBoard && !SETTLE.boardDone) {
-    SETTLE.boardDone = true;
-    if (SETTLE.postState) loadState(SETTLE.postState);
-    const board = document.getElementById('board');
-    if (board) { renderBoard(board); requestAnimationFrame(fitOcean); }
-  }
-  // 攻擊階段起始：切到中繼盤面（出兵已扣、戰役未判）。boardDone 後不再覆蓋。
-  if (b.updateBoardMid && !SETTLE.midDone && !SETTLE.boardDone) {
-    SETTLE.midDone = true;
-    if (b.midState) {
-      loadState(b.midState);
-      const board = document.getElementById('board');
-      if (board) { renderBoard(board); requestAnimationFrame(fitOcean); }
-    }
-  }
   const ov = SETTLE.overlay;
   if (b.type === 'move' && b.moveEvents) b.moveEvents.forEach((e, i) => setTimeout(() => moveToken(ov, e, 'person'), i * 200));
   // 攻擊：海鷗飛到島上停留（不消失），待兩階段戰鬥結束才退場
-  if (b.type === 'battle-intro' && b.swordEvents) b.swordEvents.forEach((e, i) => setTimeout(() => spawnBattleSeagull(ov, e, b.island, i, b.swordEvents.length), i * 200));
+  // （回上一步後再前進會重播；先清掉該島殘留海鷗，避免重複疊出）
+  if (b.type === 'battle-intro' && b.swordEvents) {
+    removeBattleSeagulls(b.island);
+    b.swordEvents.forEach((e, i) => setTimeout(() => spawnBattleSeagull(ov, e, b.island, i, b.swordEvents.length), i * 200));
+  }
   // 第一階段：突圍海鷗發黃框、其餘退場
   if (b.type === 'battle-p1') markBreakout(b.island, b.challenger);
   // 第二階段（最後一步）：突圍海鷗撲向守軍 → 爆擊 → 全部海鷗退場
@@ -763,6 +791,12 @@ function chargeBreakout(overlay, island, challenger) {
     t.el.classList.add('charge');
     t.el.style.left = c.x + 'px'; t.el.style.top = c.y + 'px';
   }
+}
+// 立即清除該島所有海鷗（供回上一步後重播用，不做淡出動畫）
+function removeBattleSeagulls(island) {
+  if (!SETTLE) return;
+  for (const t of (SETTLE.battleTokens[island] || [])) t.el.remove();
+  SETTLE.battleTokens[island] = [];
 }
 // 戰鬥結束：把該島剩餘海鷗全部退場
 function clearBattleSeagulls(island) {
